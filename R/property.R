@@ -256,10 +256,7 @@ prop_obj <- function(object, name) {
       object <- prop$setter(object, value)
     } else {
       if (isTRUE(check)) {
-        error <- prop_validate(prop, value, object)
-        if (!is.null(error)) {
-          stop(error, call. = FALSE)
-        }
+        prop_validate_or_stop(prop, value, object)
       }
 
       attr(object, name) <- value
@@ -279,10 +276,6 @@ signal_prop_error <- function(fmt, object, name) {
   stop(msg, call. = FALSE)
 }
 
-# called from src/prop.c
-signal_error <- function(msg) {
-  stop(msg, call. = FALSE)
-}
 
 
 prop_error_unknown <- function(object, prop_name) {

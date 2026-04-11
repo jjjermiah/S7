@@ -62,6 +62,49 @@
 #'   r
 #' }
 #' rightwards(r, 20)
+# ---- Validation error condition constructors --------------------------------
+
+#' @noRd
+new_error_validation_property <- function(object, errors, property = NULL) {
+  if (is.null(property)) {
+    # Batch property type errors from validate()
+    bullets <- paste0("- ", errors, collapse = "\n")
+    msg <- sprintf("%s object properties are invalid:\n%s", obj_desc(object), bullets)
+  } else {
+    # Single property error from prop<-
+    msg <- errors
+  }
+  errorCondition(
+    msg,
+    call = NULL,
+    class = c("S7_error_validation_property", "S7_error_validation"),
+    object_class = obj_desc(object),
+    property = property,
+    errors = errors
+  )
+}
+
+#' @noRd
+new_error_validation_object <- function(object, errors) {
+  bullets <- paste0("- ", errors, collapse = "\n")
+  msg <- sprintf("%s object is invalid:\n%s", obj_desc(object), bullets)
+  errorCondition(
+    msg,
+    call = NULL,
+    class = c("S7_error_validation_object", "S7_error_validation"),
+    object_class = obj_desc(object),
+    errors = errors
+  )
+}
+
+# Called from src/prop.c and R prop<- to validate a single property and stop
+# with a structured condition if invalid.
+prop_validate_or_stop <- function(prop, value, object) {
+  error <- prop_validate(prop, value, object)
+  if (is.null(error)) return(invisible(NULL))
+  stop(new_error_validation_property(object, error, property = prop$name))
+}
+
 validate <- function(object, recursive = TRUE, properties = TRUE) {
   check_is_S7(object)
 
@@ -76,9 +119,7 @@ validate <- function(object, recursive = TRUE, properties = TRUE) {
   if (properties) {
     errors <- validate_properties(object, class)
     if (length(errors) > 0) {
-      bullets <- paste0("- ", errors, collapse = "\n")
-      msg <- sprintf("%s object properties are invalid:\n%s", obj_desc(object), bullets)
-      stop(msg, call. = FALSE)
+      stop(new_error_validation_property(object, errors))
     }
   }
 
@@ -102,9 +143,7 @@ validate <- function(object, recursive = TRUE, properties = TRUE) {
 
   # If needed, report errors
   if (length(errors) > 0) {
-    bullets <- paste0("- ", errors, collapse = "\n")
-    msg <- sprintf("%s object is invalid:\n%s", obj_desc(object), bullets)
-    stop(msg, call. = FALSE)
+    stop(new_error_validation_object(object, errors))
   }
 
   invisible(object)

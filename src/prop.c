@@ -106,20 +106,6 @@ void signal_prop_error_unknown(SEXP object, SEXP name) {
   signal_prop_error("Can't find property %s@%s", object, name);
 }
 
-static __attribute__((noreturn))
-void signal_error(SEXP errmsg) {
-  PROTECT(errmsg);
-  if(TYPEOF(errmsg) == STRSXP && Rf_length(errmsg) == 1)
-    Rf_errorcall(R_NilValue, "%s", CHAR(STRING_ELT(errmsg, 0)));
-
-  // fallback to calling base::stop(errmsg)
-  static SEXP signal_error = NULL;
-  if (signal_error == NULL)
-    signal_error = ns_get("signal_error");
-
-  eval_here(Rf_lang2(signal_error, errmsg));
-  while(1);
-}
 
 static inline
 int name_idx(SEXP list, const char* name) {
@@ -246,12 +232,11 @@ void accessor_no_recurse_clear(SEXP object, SEXP name_sym, SEXP no_recurse_list_
 static inline
 void prop_validate(SEXP property, SEXP value, SEXP object) {
 
-  static SEXP prop_validate = NULL;
-  if (prop_validate == NULL)
-    prop_validate = ns_get("prop_validate");
+  static SEXP fn_prop_validate_or_stop = NULL;
+  if (fn_prop_validate_or_stop == NULL)
+    fn_prop_validate_or_stop = ns_get("prop_validate_or_stop");
 
-  SEXP errmsg = eval_here(Rf_lang4(prop_validate, property, value, object));
-  if (errmsg != R_NilValue) signal_error(errmsg);
+  eval_here(Rf_lang4(fn_prop_validate_or_stop, property, value, object));
 }
 
 static inline

@@ -90,3 +90,106 @@ test_that("valid implicitly does _not_ call the validation function", {
   })
   expect_error(validate(obj), "must be positive")
 })
+
+
+# ---- Validation error condition classes -------------------------------------
+
+test_that("property type errors have S7_error_validation_property class", {
+  klass <- new_class("klass", package = NULL,
+    properties = list(x = class_double, y = class_double)
+  )
+  obj <- klass(1, 2)
+  attr(obj, "x") <- "bad"
+
+  cnd <- tryCatch(validate(obj), S7_error_validation_property = identity)
+  expect_s3_class(cnd, "S7_error_validation_property")
+  expect_s3_class(cnd, "S7_error_validation")
+  expect_s3_class(cnd, "error")
+  expect_equal(cnd$object_class, "<klass>")
+  expect_equal(cnd$errors, "@x must be <double>, not <character>")
+  expect_null(cnd$property)
+  expect_null(cnd$call)
+})
+
+test_that("object validator errors have S7_error_validation_object class", {
+  klass <- new_class("klass", package = NULL,
+    properties = list(x = class_double, y = class_double),
+    validator = function(self) {
+      c(
+        if (self@x < 0) "x must be positive",
+        if (self@y > 0) "y must be negative"
+      )
+    }
+  )
+  obj <- klass(1, -1)
+  attr(obj, "x") <- -1
+
+  cnd <- tryCatch(validate(obj), S7_error_validation_object = identity)
+  expect_s3_class(cnd, "S7_error_validation_object")
+  expect_s3_class(cnd, "S7_error_validation")
+  expect_equal(cnd$object_class, "<klass>")
+  expect_equal(cnd$errors, "x must be positive")
+  expect_null(cnd$call)
+})
+
+test_that("property setter errors have S7_error_validation_property class", {
+  foo <- new_class("foo", package = NULL,
+    properties = list(x = class_double)
+  )
+  obj <- foo(1)
+
+  cnd <- tryCatch(obj@x <- "bad", S7_error_validation_property = identity)
+  expect_s3_class(cnd, "S7_error_validation_property")
+  expect_s3_class(cnd, "S7_error_validation")
+  expect_equal(cnd$object_class, "<foo>")
+  expect_equal(cnd$property, "x")
+  expect_equal(cnd$errors, "<foo>@x must be <double>, not <character>")
+  expect_null(cnd$call)
+})
+
+test_that("all validation errors are catchable via S7_error_validation", {
+  foo <- new_class("foo", package = NULL,
+    properties = list(x = class_double),
+    validator = function(self) if (self@x < 0) "x must be positive"
+  )
+
+  # Property type error via prop<-
+  cnd1 <- tryCatch(foo("bad"), S7_error_validation = identity)
+  expect_s3_class(cnd1, "S7_error_validation")
+
+  # Object validator error
+  obj <- foo(1)
+  attr(obj, "x") <- -1
+  cnd2 <- tryCatch(validate(obj), S7_error_validation = identity)
+  expect_s3_class(cnd2, "S7_error_validation")
+})
+
+test_that("validation error metadata has multiple property errors", {
+  klass <- new_class("klass", package = NULL,
+    properties = list(x = class_double, y = class_integer)
+  )
+  obj <- klass(1, 1L)
+  attr(obj, "x") <- "a"
+  attr(obj, "y") <- "b"
+
+  cnd <- tryCatch(validate(obj), S7_error_validation_property = identity)
+  expect_length(cnd$errors, 2)
+  expect_match(cnd$errors[[1]], "@x")
+  expect_match(cnd$errors[[2]], "@y")
+  expect_null(cnd$property)
+})
+
+test_that("custom validator errors via prop<- have correct metadata", {
+  validate_positive <- function(value) {
+    if (value <= 0) "must be positive"
+  }
+  prop <- new_property(class_double, validator = validate_positive)
+  foo <- new_class("foo", package = NULL, properties = list(x = prop))
+  obj <- foo(1)
+
+  cnd <- tryCatch(obj@x <- -1, S7_error_validation_property = identity)
+  expect_s3_class(cnd, "S7_error_validation_property")
+  expect_equal(cnd$property, "x")
+  expect_match(conditionMessage(cnd), "must be positive")
+  expect_null(cnd$call)
+})
