@@ -1,0 +1,9 @@
+Package: s7problemdemo
+Title: Example Package Mapping S7 Validation to Problem Details
+Version: 0.0.0.9000
+Authors@R: person("S7", "Example", email = "example@example.com", role = c("aut", "cre"))
+Description: A minimal child package that catches S7 validation conditions and
+    converts them to RFC 9457-style problem details at an API boundary.
+Imports: S7
+License: CC0-1.0
+Encoding: UTF-8
