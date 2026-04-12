@@ -90,3 +90,55 @@ test_that("valid implicitly does _not_ call the validation function", {
   })
   expect_error(validate(obj), "must be positive")
 })
+
+
+describe("validation error class", {
+  klass <- new_class("klass", package = NULL,
+    properties = list(x = class_double),
+    validator = function(self) if (self@x < 0) "x must be positive"
+  )
+
+  it("property errors have class S7_error_validation_failed", {
+    obj <- klass(1)
+    attr(obj, "x") <- "bad"
+
+    cnd <- tryCatch(validate(obj), S7_error_validation_failed = identity)
+    expect_s3_class(cnd, c("S7_error_validation_failed", "error", "condition"), exact = TRUE)
+    expect_equal(cnd$object_class, "<klass>")
+    expect_equal(cnd$errors, "@x must be <double>, not <character>")
+    expect_null(cnd$call)
+  })
+
+  it("custom validator errors have class S7_error_validation_failed", {
+    obj <- klass(1)
+    attr(obj, "x") <- -1
+
+    cnd <- tryCatch(validate(obj), S7_error_validation_failed = identity)
+    expect_s3_class(cnd, c("S7_error_validation_failed", "error", "condition"), exact = TRUE)
+    expect_equal(cnd$object_class, "<klass>")
+    expect_equal(cnd$errors, "x must be positive")
+    expect_null(cnd$call)
+  })
+
+  it("both are catchable via the single class", {
+    obj <- klass(1)
+    attr(obj, "x") <- "bad"
+    cnd1 <- tryCatch(validate(obj), S7_error_validation_failed = identity)
+    expect_s3_class(cnd1, "S7_error_validation_failed")
+
+    obj2 <- klass(1)
+    attr(obj2, "x") <- -1
+    cnd2 <- tryCatch(validate(obj2), S7_error_validation_failed = identity)
+    expect_s3_class(cnd2, "S7_error_validation_failed")
+  })
+
+  it("setter errors also use structured property conditions", {
+    obj <- klass(1)
+
+    cnd <- tryCatch({ obj@x <- "bad" }, S7_error_validation_failed = identity)
+    expect_s3_class(cnd, c("S7_error_validation_failed", "error", "condition"), exact = TRUE)
+    expect_equal(cnd$object_class, "<klass>")
+    expect_equal(cnd$errors, "<klass>@x must be <double>, not <character>")
+    expect_null(cnd$call)
+  })
+})

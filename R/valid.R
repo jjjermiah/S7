@@ -19,7 +19,21 @@
 #' @param recursive If `TRUE`, calls validator of parent classes recursively.
 #' @param properties If `TRUE`, the default, checks property types before
 #'   executing the validator.
-#' @returns Either `object` invisibly if valid, otherwise an error.
+#' @returns `object`, invisibly, if valid. Otherwise an error is signalled.
+#'
+#' @details # Validation errors 
+#'
+#' When validation fails, [validate()] signals `S7_error_validation_failed`,
+#' which can be caught with [tryCatch()].
+#'
+#' These conditions include the following fields:
+#'
+#' * `message`: the error message.
+#' * `object_class`: the formatted class description, like `"<Range>"`.
+#' * `errors`: a character vector of validation errors.
+#'
+#' The message differs depending on whether the failure came from property
+#' validation or the object validator.
 #' @export
 #' @examples
 #' # A range class might validate that the start is less than the end
@@ -76,9 +90,7 @@ validate <- function(object, recursive = TRUE, properties = TRUE) {
   if (properties) {
     errors <- validate_properties(object, class)
     if (length(errors) > 0) {
-      bullets <- paste0("- ", errors, collapse = "\n")
-      msg <- sprintf("%s object properties are invalid:\n%s", obj_desc(object), bullets)
-      stop(msg, call. = FALSE)
+      stop(new_error_validation_failed(object, errors, source = "property"))
     }
   }
 
@@ -102,12 +114,34 @@ validate <- function(object, recursive = TRUE, properties = TRUE) {
 
   # If needed, report errors
   if (length(errors) > 0) {
-    bullets <- paste0("- ", errors, collapse = "\n")
-    msg <- sprintf("%s object is invalid:\n%s", obj_desc(object), bullets)
-    stop(msg, call. = FALSE)
+    stop(new_error_validation_failed(object, errors, source = "object"))
   }
 
   invisible(object)
+}
+
+# ---- Validation condition constructors ---------------------------------------
+
+new_error_validation_failed <- function(object, errors, source = c("object", "property"), single = FALSE) {
+  source <- match.arg(source)
+
+  if (single) {
+    msg <- errors
+  } else if (source == "property") {
+    bullets <- paste0("- ", errors, collapse = "\n")
+    msg <- sprintf("%s object properties are invalid:\n%s", obj_desc(object), bullets)
+  } else {
+    bullets <- paste0("- ", errors, collapse = "\n")
+    msg <- sprintf("%s object is invalid:\n%s", obj_desc(object), bullets)
+  }
+
+  errorCondition(
+    msg,
+    call = NULL,
+    class = "S7_error_validation_failed",
+    object_class = obj_desc(object),
+    errors = errors
+  )
 }
 
 validate_properties <- function(object, class) {
