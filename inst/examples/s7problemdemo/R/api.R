@@ -5,19 +5,31 @@
 ListWidgetsQuery <- S7::new_class(
   "ListWidgetsQuery",
   properties = list(
-    limit = S7::new_property(S7::class_character, default = "20"),
-    sort = S7::new_property(S7::class_character, default = "asc")
-  ),
-  validator = function(self) {
-    c(
-      if (!grepl("^[0-9]+$", self@limit) || as.integer(self@limit) < 1L) {
-        "'limit' must be a positive integer query parameter"
-      },
-      if (!self@sort %in% c("asc", "desc")) {
-        "'sort' must be either 'asc' or 'desc'"
+    limit = S7::new_property(S7::class_character, default = "20",
+      validator = function(value) {
+        if (length(value) != 1) {
+          return("'limit' must be a single non-empty string")
+        }
+
+        if (!grepl("^[0-9]+$", value)) {
+          return("'limit' must be a string representing a positive integer")
+        }
       }
-    )
-  }
+    ),
+    sort = S7::new_property(
+      S7::class_character,
+      default = "asc", 
+      validator = function(value) {
+        if (length(value) != 1) {
+          return("'sort' must be a single non-empty string")
+        }
+
+        if (!value %in% c("asc", "desc")) {
+          return("'sort' must be either 'asc' or 'desc'")
+        }
+      }
+  )
+  )
 )
 
 ################################
@@ -32,20 +44,11 @@ WidgetResponse <- S7::new_class(
   ),
   validator = function(self) {
     if (!self@status %in% c("accepted", "queued")) {
-      "'status' must be either 'accepted' or 'queued'"
+      sprintf("'status' must be either 'accepted' or 'queued' but got '%s'", self@status)
     }
   }
 )
 
-validation_problem <- function(cnd, title, status, detail) {
-  list(
-    type = class(cnd)[1],
-    title = title,
-    status = status,
-    detail = detail,
-    errors = cnd$errors
-  )
-}
 
 ###############################
 ## API route
@@ -54,30 +57,46 @@ validation_problem <- function(cnd, title, status, detail) {
 #* Show S7 validation as RFC 9457-style problem details
 #*
 #* @get /widgets
-#* @query limit:string Page size to request.
-#* @query sort:string Sort direction.
+#* @query limit Page size to request.
+#* @query sort Sort direction. Must be either "asc" or "desc".
 #* @query induce_bug:boolean Force the output validation path.
 #* @serializer unboxedJSON
 function(query, response) {
+  # super messy implementation here for full demonstration, 
+  # key point is to show how to catch validation errors and return them as 
+  # problem details with appropriate status codes, content type, and language header.
+  # In a real implementation, you'd likely want to factor out the error handling into a reusable function or middleware.
   request <- tryCatch(
     ListWidgetsQuery(
-      limit = if (is.null(query$limit)) "20" else as.character(query$limit),
-      sort = if (is.null(query$sort)) "asc" else as.character(query$sort)
+      limit = as.character(query$limit),
+      sort = as.character(query$sort)
     ),
     S7_error_validation_failed = function(cnd) {
       response$status <- 422L
       response$type <- "application/problem+json"
       response$set_header("Content-Language", "en")
-      validation_problem(
-        cnd,
-        title = "Request validation failed",
+      response$body <- list(
         status = 422L,
-        detail = "The request parameters failed validation."
+        title = "Unprocessable request",
+        detail = "The request parameters failed validation",
+        errors = I(cnd$errors)
+      )
+    },
+    error = function(err) {
+      response$status <- 500L
+      response$type <- "application/problem+json"
+      response$set_header("Content-Language", "en")
+      response$body <- list(
+        title = "Internal Server Error",
+        status = 500L,
+        detail = "An unexpected error occurred while processing the request. Please report this to the API maintainers.",
+        error = list(message = err$message, class = class(err))
       )
     }
   )
 
-  if (!inherits(request, "S7_object")) {
+  if (!S7::S7_inherits(request, ListWidgetsQuery)) {
+    # log here
     return(request)
   }
 
@@ -90,17 +109,16 @@ function(query, response) {
       response$status <- 500L
       response$type <- "application/problem+json"
       response$set_header("Content-Language", "en")
-      validation_problem(
-        cnd,
+      response$body <- list(
         title = "Internal Server Error",
         status = 500L,
-        detail = "The server produced an invalid response.",
-        pointers = validation_pointers(cnd$errors, status = TRUE)
+        detail = "An unexpected error occurred while processing the request. Please report this to the API maintainers.",
+        errors = I(cnd$errors)
       )
     }
   )
 
-  if (!inherits(response_value, "S7_object")) {
+  if (!S7::S7_inherits(response_value, WidgetResponse)) {
     return(response_value)
   }
 
