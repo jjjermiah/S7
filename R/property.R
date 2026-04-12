@@ -258,7 +258,7 @@ prop_obj <- function(object, name) {
       if (isTRUE(check)) {
         error <- prop_validate(prop, value, object)
         if (!is.null(error)) {
-          signal_error(new_error_validation_property(object, error, single = TRUE))
+          signal_error(new_error_validation_failed(object, error, source = "property", single = TRUE))
         }
       }
 

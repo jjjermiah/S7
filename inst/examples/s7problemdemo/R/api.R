@@ -1,5 +1,5 @@
 ###############################
-## S7 classes
+## Request Class
 ###############################
 
 ListWidgetsQuery <- S7::new_class(
@@ -20,6 +20,10 @@ ListWidgetsQuery <- S7::new_class(
   }
 )
 
+################################
+## Response Class
+################################
+
 WidgetResponse <- S7::new_class(
   "WidgetResponse",
   properties = list(
@@ -33,36 +37,14 @@ WidgetResponse <- S7::new_class(
   }
 )
 
-validation_problem <- function(cnd, title, status, detail, pointers) {
+validation_problem <- function(cnd, title, status, detail) {
   list(
     type = class(cnd)[1],
     title = title,
     status = status,
     detail = detail,
-    errors = unname(Map(
-      function(error, pointer) {
-        list(detail = error, pointer = pointer)
-      },
-      cnd$errors,
-      pointers
-    ))
+    errors = cnd$errors
   )
-}
-
-validation_pointers <- function(errors, limit = NULL, sort = NULL, status = NULL) {
-  pointers <- character()
-
-  if (!is.null(limit) && any(grepl("'limit'", errors, fixed = TRUE))) {
-    pointers <- c(pointers, "#/limit")
-  }
-  if (!is.null(sort) && any(grepl("'sort'", errors, fixed = TRUE))) {
-    pointers <- c(pointers, "#/sort")
-  }
-  if (!is.null(status) && any(grepl("'status'", errors, fixed = TRUE))) {
-    pointers <- c(pointers, "#/status")
-  }
-
-  pointers
 }
 
 ###############################
@@ -82,7 +64,7 @@ function(query, response) {
       limit = if (is.null(query$limit)) "20" else as.character(query$limit),
       sort = if (is.null(query$sort)) "asc" else as.character(query$sort)
     ),
-    S7_error_validation = function(cnd) {
+    S7_error_validation_failed = function(cnd) {
       response$status <- 422L
       response$type <- "application/problem+json"
       response$set_header("Content-Language", "en")
@@ -90,8 +72,7 @@ function(query, response) {
         cnd,
         title = "Request validation failed",
         status = 422L,
-        detail = "The request parameters failed validation.",
-        pointers = validation_pointers(cnd$errors, limit = query$limit, sort = query$sort)
+        detail = "The request parameters failed validation."
       )
     }
   )
@@ -105,7 +86,7 @@ function(query, response) {
       id = paste0("widget-limit-", request@limit),
       status = if (isTRUE(query$induce_bug)) "broken" else "queued"
     ),
-    S7_error_validation = function(cnd) {
+    S7_error_validation_failed = function(cnd) {
       response$status <- 500L
       response$type <- "application/problem+json"
       response$set_header("Content-Language", "en")
