@@ -1,4 +1,17 @@
-
+#' Greet a person by name
+#' This function takes a name as input and returns a greeting message.
+#' @param name A character string representing the name of the person to greet.
+#' @return A character string containing the greeting message.
+#' @examples
+#' greet("Alice")
+#' greet("Bob")
+#' @export
+greet <- function(name) {
+  if (missing(name)) {
+    stop("Please provide a name.")
+  }
+  paste0("Hello, ", name, "!")
+}
 
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
