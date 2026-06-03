@@ -14,7 +14,7 @@
   : Register an S7 method for a generic
 - [`S7_inherits()`](https://rconsortium.github.io/S7/reference/S7_inherits.md)
   [`check_is_S7()`](https://rconsortium.github.io/S7/reference/S7_inherits.md)
-  : Does this object inherit from an S7 class?
+  : Does this object inherit from a class?
 - [`validate()`](https://rconsortium.github.io/S7/reference/validate.md)
   [`valid_eventually()`](https://rconsortium.github.io/S7/reference/validate.md)
   [`valid_implicitly()`](https://rconsortium.github.io/S7/reference/validate.md)
@@ -30,6 +30,7 @@
   Get/set a property
 - [`prop_names()`](https://rconsortium.github.io/S7/reference/prop_names.md)
   [`prop_exists()`](https://rconsortium.github.io/S7/reference/prop_names.md)
+  [`prop_info()`](https://rconsortium.github.io/S7/reference/prop_names.md)
   : Property introspection
 - [`props()`](https://rconsortium.github.io/S7/reference/props.md)
   [`` `props<-`() ``](https://rconsortium.github.io/S7/reference/props.md)
@@ -47,14 +48,19 @@
   : Dispatch on a missing argument
 - [`class_any`](https://rconsortium.github.io/S7/reference/class_any.md)
   : Dispatch on any class
+- [`super()`](https://rconsortium.github.io/S7/reference/super.md) :
+  Force method dispatch to use a superclass
+
+## Introspection
+
 - [`method()`](https://rconsortium.github.io/S7/reference/method.md) :
   Find a method for an S7 generic
 - [`method_explain()`](https://rconsortium.github.io/S7/reference/method_explain.md)
   : Explain method dispatch
-- [`super()`](https://rconsortium.github.io/S7/reference/super.md) :
-  Force method dispatch to use a superclass
 - [`S7_class()`](https://rconsortium.github.io/S7/reference/S7_class.md)
-  : Retrieve the S7 class of an object
+  : Retrieve the class specification of an object
+- [`S7_class_desc()`](https://rconsortium.github.io/S7/reference/S7_class_desc.md)
+  : Format a class specification as a string
 
 ## Packages
 
@@ -85,12 +91,14 @@ for more details.
   [`class_name`](https://rconsortium.github.io/S7/reference/base_classes.md)
   [`class_call`](https://rconsortium.github.io/S7/reference/base_classes.md)
   [`class_function`](https://rconsortium.github.io/S7/reference/base_classes.md)
-  [`class_environment`](https://rconsortium.github.io/S7/reference/base_classes.md)
   [`class_numeric`](https://rconsortium.github.io/S7/reference/base_classes.md)
   [`class_atomic`](https://rconsortium.github.io/S7/reference/base_classes.md)
   [`class_vector`](https://rconsortium.github.io/S7/reference/base_classes.md)
   [`class_language`](https://rconsortium.github.io/S7/reference/base_classes.md)
   : S7 wrappers for base types
+- [`class_environment`](https://rconsortium.github.io/S7/reference/class_environment.md)
+  **\[experimental\]** : Use an environment as the base type of an S7
+  class
 - [`class_factor`](https://rconsortium.github.io/S7/reference/base_s3_classes.md)
   [`class_Date`](https://rconsortium.github.io/S7/reference/base_s3_classes.md)
   [`class_POSIXct`](https://rconsortium.github.io/S7/reference/base_s3_classes.md)
@@ -102,4 +110,4 @@ for more details.
 - [`new_S3_class()`](https://rconsortium.github.io/S7/reference/new_S3_class.md)
   : Declare an S3 class
 - [`S4_register()`](https://rconsortium.github.io/S7/reference/S4_register.md)
-  : Register an S7 class with S4
+  : Register an S7 or S3 class with S4

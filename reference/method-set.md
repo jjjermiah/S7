@@ -39,8 +39,7 @@ method(generic, signature) <- value
 
   A method signature.
 
-  For S7 generics that use single dispatch, this must be one of the
-  following:
+  For single-dispatch generics, this must be one of the following:
 
   - An S7 class (created by
     [`new_class()`](https://rconsortium.github.io/S7/reference/new_class.md)).
@@ -49,7 +48,8 @@ method(generic, signature) <- value
     [`new_union()`](https://rconsortium.github.io/S7/reference/new_union.md)).
 
   - An S3 class (created by
-    [`new_S3_class()`](https://rconsortium.github.io/S7/reference/new_S3_class.md)).
+    [`new_S3_class()`](https://rconsortium.github.io/S7/reference/new_S3_class.md))
+    or `NULL`.
 
   - An S4 class (created by
     [`methods::getClass()`](https://rdrr.io/r/methods/getClass.html) or
@@ -66,18 +66,15 @@ method(generic, signature) <- value
     or
     [class_any](https://rconsortium.github.io/S7/reference/class_any.md).
 
-  For S7 generics that use multiple dispatch, this must be a list of any
-  of the above types.
+  - A length-1 list containing any of the above.
 
-  For S3 generics, this must be a single S7 class.
-
-  For S4 generics, this must either be an S7 class, or a list that
-  includes at least one S7 class.
+  For generics that use multiple dispatch, this must be a list of any of
+  the above types.
 
 - value:
 
   A function that implements the generic specification for the given
-  `signature`.
+  `signature`, or `NULL` to unregister an existing method.
 
 ## Value
 
@@ -104,4 +101,7 @@ bizarro(head(mtcars))
 #> Hornet 4 Drive       1    4  1  1 18.61 2.320 3.85  93  108   4 22.8
 #> Hornet Sportabout    4    4  1  0 17.02 2.875 3.90 110  160   6 21.0
 #> Valiant              4    4  1  0 16.46 2.620 3.90 110  160   6 21.0
+
+# Unregister a method by assigning `NULL`
+method(bizarro, class_numeric) <- NULL
 ```

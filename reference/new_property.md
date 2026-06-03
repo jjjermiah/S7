@@ -33,6 +33,9 @@ new_property(
   [`as_class()`](https://rconsortium.github.io/S7/reference/as_class.md)
   for details.
 
+  If you want to make a property optional, create a union with `NULL`,
+  e.g. `class_integer | NULL`.
+
 - getter:
 
   An optional function used to get the value. The function should take
@@ -44,8 +47,14 @@ new_property(
 
 - setter:
 
-  An optional function used to set the value. The function should take
-  `self` and `value` and return a modified object.
+  An optional function used to set the value. There are two supported
+  forms:
+
+  - `function(self, value)` is supplied the object and the value.
+
+  - `function(self, name, value)` also gets the property name being set,
+    which makes it easy to reuse the same property for multiple
+    properties.
 
 - validator:
 
@@ -63,10 +72,18 @@ new_property(
 - default:
 
   When an object is created and the property is not supplied, what
-  should it default to? If `NULL`, it defaults to the "empty" instance
-  of `class`. This can also be a quoted call, which then becomes a
-  standard function promise in the default constructor, evaluated at the
-  time the object is constructed.
+  should it default to?
+
+  If `NULL`, it defaults to the "empty" instance of `class`. For base
+  vector types, this will be a zero length vector, e.g.
+  [`character()`](https://rdrr.io/r/base/character.html) for
+  [`class_character()`](https://rconsortium.github.io/S7/reference/base_classes.md).
+  For S7 classes, this will be a call to the constructor
+
+  This can also be a
+  [`quote()`](https://rdrr.io/r/base/substitute.html)d call, which then
+  becomes a standard function promise in the default constructor,
+  evaluated when the object is constructed.
 
 - name:
 
@@ -84,11 +101,14 @@ An S7 property, i.e. a list with class `S7_property`.
 ``` r
 # Simple properties store data inside an object
 Pizza <- new_class("Pizza", properties = list(
-  slices = new_property(class_numeric, default = 10)
+  slices = new_property(class_numeric, default = 10),
+  special = new_property(NULL | class_character)
 ))
-my_pizza <- Pizza(slices = 6)
+my_pizza <- Pizza(slices = 6, special = "mushrooms")
 my_pizza@slices
 #> [1] 6
+my_pizza@special
+#> [1] "mushrooms"
 my_pizza@slices <- 5
 my_pizza@slices
 #> [1] 5
@@ -96,6 +116,8 @@ my_pizza@slices
 your_pizza <- Pizza()
 your_pizza@slices
 #> [1] 10
+your_pizza@special
+#> NULL
 
 # Dynamic properties can compute on demand
 Clock <- new_class("Clock", properties = list(
@@ -103,12 +125,12 @@ Clock <- new_class("Clock", properties = list(
 ))
 my_clock <- Clock()
 my_clock@now; Sys.sleep(1)
-#> [1] "2026-04-08 23:19:52 UTC"
+#> [1] "2026-06-03 17:40:33 UTC"
 my_clock@now
-#> [1] "2026-04-08 23:19:53 UTC"
+#> [1] "2026-06-03 17:40:34 UTC"
 # This property is read only, because there is a 'getter' but not a 'setter'
 try(my_clock@now <- 10)
-#> Error : Can't set read-only property <Clock>@now
+#> Error in `<Clock>@now`() : Can't set read-only property.
 
 # Because the property is dynamic, it is not included as an
 # argument to the default constructor

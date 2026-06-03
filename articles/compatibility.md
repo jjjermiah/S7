@@ -4,6 +4,7 @@ S7 is designed to be compatible with S3 and S4. This vignette discusses
 the details.
 
 ``` r
+
 library(S7)
 ```
 
@@ -24,13 +25,8 @@ There are two main differences between an S7 object and an S3 object:
 
 All up, this means most usage of S7 with S3 will just work.
 
-- S7 can register methods for:
-
-  - S7 class and S3 generic
-  - S3 class and S7 generic
-
+- S7 can register methods for S3 generics and S3 classes
 - S7 classes can extend S3 classes
-
 - S3 classes can extend S7 classes
 
 ### Methods
@@ -42,16 +38,46 @@ class and S3 generic without using S7, because all S7 objects have S3
 classes, and S3 dispatch will operate on them normally.
 
 ``` r
-Foo <- new_class("Foo")
-class(Foo())
-#> [1] "Foo"       "S7_object"
 
-mean.Foo <- function(x, ...) {
+Foo <- new_class("Foo", package = "Bar")
+class(Foo())
+#> [1] "Bar::Foo"  "S7_object"
+
+`mean.Bar::Foo` <- function(x, ...) {
   "mean of foo"
 }
 
 mean(Foo())
 #> [1] "mean of foo"
+```
+
+Note that when defining classes in a package, the S3 class name will be
+`{package}::{class}`, and that means you’ll need to use `` ` `` to
+define S3 methods.
+
+### Generics
+
+If you convert an S3 generic to an S7 generic and want existing S3
+methods (typically in other packages) to continue to work, add a
+`class_any` method that calls
+[`UseMethod()`](https://rdrr.io/r/base/UseMethod.html):
+
+``` r
+
+foo <- new_generic("foo", "x")
+
+# Default method dispatches to S3
+method(foo, class_any) <- function(x, ...) {
+  UseMethod("foo")
+}
+```
+
+And then if you need a genuine default method, use S3:
+
+``` r
+
+# Define the "true" default method
+foo.default <- function(x) paste0(x, " + 10")
 ```
 
 ### Classes
@@ -66,6 +92,7 @@ and its subclasses don’t need to change.
 Many simple S3 classes are implemented as lists, e.g. rle.
 
 ``` r
+
 rle <- function(x) {
   if (!is.vector(x) && !is.list(x)) {
     stop("'x' must be a vector of an atomic type")
@@ -95,6 +122,7 @@ exactly the same, using a `list` as the underlying data structure and
 using a constructor to enforce the structure:
 
 ``` r
+
 new_rle <- new_class("rle",
   parent = class_list,
   constructor = function(lengths, values) {
@@ -111,6 +139,7 @@ Alternatively you could convert it to the most natural representation
 using S7:
 
 ``` r
+
 new_rle <- new_class("rle", properties = list(
   lengths = class_integer,
   values = class_atomic
@@ -121,6 +150,7 @@ To allow existing methods to work you’ll need to override `$` to access
 properties instead of list elements:
 
 ``` r
+
 method(`$`, new_rle) <- prop
 rle(1:10)
 #> Run Length Encoding
@@ -138,9 +168,7 @@ they can be dynamic.
 
 - S7 classes can not extend S4 classes
 - S4 classes can extend S3 classes
-- S7 can register methods for:
-  - S7 class and S4 generic
-  - S4 class and S7 generic
+- S7 can register methods for S4 generics and S4 classes
 
 ### Unions
 
@@ -153,6 +181,7 @@ that registering a method for a union is just short-hand for registering
 a method for each of the classes.
 
 ``` r
+
 Class1 <- new_class("Class1")
 Class2 <- new_class("Class2")
 Union1 <- new_union(Class1, Class2)

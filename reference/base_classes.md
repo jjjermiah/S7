@@ -25,7 +25,12 @@ within S7:
 
 - `class_function`
 
-- `class_environment` (can only be used for properties)
+For method registration and properties, you can use `NULL` directly.
+
+See also
+[class_environment](https://rconsortium.github.io/S7/reference/class_environment.md)
+which is documented separately due to the complexities introduced by
+their reference semantics.
 
 We also include three union types to model numerics, atomics, and
 vectors respectively:
@@ -65,8 +70,6 @@ class_call
 
 class_function
 
-class_environment
-
 class_numeric
 
 class_atomic
@@ -83,6 +86,7 @@ S7 classes wrapping around common base types and S3 classes.
 ## Examples
 
 ``` r
+
 class_integer
 #> <S7_base_class>: <integer>
 class_numeric
