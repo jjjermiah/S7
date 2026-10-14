@@ -77,6 +77,7 @@ SEXP sym_S7_dispatch;
 SEXP sym_name;
 
 SEXP fn_base_quote;
+SEXP fn_dispatch_dots;
 SEXP missing_call;
 
 SEXP ns_S7;
@@ -152,4 +153,5 @@ void R_init_S7(DllInfo *dll)
     SEXP fn_missing = PROTECT(Rf_eval(Rf_install("dispatch_arg_missing"), ns_S7));
     R_PreserveObject(missing_call = Rf_lang2(fn_missing, R_NilValue));
     UNPROTECT(1);
+    R_PreserveObject(fn_dispatch_dots = Rf_eval(Rf_install("dispatch_dots"), ns_S7));
 }

@@ -11,6 +11,7 @@ extern SEXP sym_name;
 extern SEXP sym_u_dispatched_super;
 
 extern SEXP fn_base_quote;
+extern SEXP fn_dispatch_dots;
 extern SEXP missing_call;
 extern SEXP R_TRUE;
 
@@ -175,6 +176,27 @@ SEXP S7_object_(void) {
   return Rf_shallow_duplicate(s7_proto_object);
 }
 
+struct method_eval_data {
+  SEXP call;
+  SEXP envir;
+  SEXP dots; // `...` in envir before dispatch, or R_UnboundValue
+};
+
+static SEXP method_eval(void *data_) {
+  struct method_eval_data *data = (struct method_eval_data *) data_;
+  return Rf_eval(data->call, data->envir);
+}
+
+// Restore the generic's own `...`, also when the method exits non-locally.
+static void method_eval_cleanup(void *data_) {
+  struct method_eval_data *data = (struct method_eval_data *) data_;
+  if (data->dots == R_UnboundValue) {
+    s7_clear_var_in_frame(data->envir, R_DotsSymbol);
+  } else {
+    Rf_defineVar(R_DotsSymbol, data->dots, data->envir);
+  }
+}
+
 SEXP method_call_(SEXP call_, SEXP op_, SEXP args_, SEXP env_) {
   args_ = CDR(args_);
   SEXP generic = CAR(args_); args_ = CDR(args_);
@@ -297,9 +319,32 @@ SEXP method_call_(SEXP call_, SEXP op_, SEXP args_, SEXP env_) {
   }
 
   Rf_defineVar(method_name, m, envir);
-  SETCAR(mcall, method_name);
 
-  SEXP out = Rf_eval(mcall, envir);
-  UNPROTECT(4);
+  // `mcall` holds the arguments for the method: dispatch args as their original
+  // (forced) promises, other args as their promises, and `...`. Recording these
+  // promises in the method's call breaks deparse() of conditionCall() and
+  // sys.call() on released versions of R (#783), because deparse() forces a
+  // promise and then can't print the S7 object it holds. So instead we collect the arguments
+  // into a `...` (a DOTSXP: it keeps tags and promises, so substitute() still
+  // finds the original expressions) and call the method as `method(...)`.
+  //
+  // R only exposes a DOTSXP as the `...` of a frame, so get one by calling
+  // dispatch_dots() with the arguments, from envir so that `...` is expanded.
+  SETCAR(mcall, fn_dispatch_dots);
+  SEXP dots_env = PROTECT(Rf_eval(mcall, envir));
+  SEXP dots = Rf_findVarInFrame(dots_env, R_DotsSymbol);
+
+  // The method is still called from envir (the generic's frame), so that
+  // parent.frame() etc. are unchanged. Hence `...` must be bound in envir for
+  // the duration of the call.
+  struct method_eval_data data = {
+    PROTECT(Rf_lang2(method_name, R_DotsSymbol)),
+    envir,
+    PROTECT(Rf_findVarInFrame(envir, R_DotsSymbol))
+  };
+  Rf_defineVar(R_DotsSymbol, dots, envir);
+
+  SEXP out = R_ExecWithCleanup(method_eval, &data, method_eval_cleanup, &data);
+  UNPROTECT(7);
   return out;
 }

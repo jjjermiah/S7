@@ -319,3 +319,81 @@ test_that("errors from dispatched methods have reasonable tracebacks", {
     function(x, y) get_call_stack()
   expect_snapshot(my_generic(3, 4))
 })
+
+test_that("the call of a dispatched method can be deparsed (#783)", {
+  skip_if_not_installed("rlang")
+
+  Foo <- new_class("Foo", package = NULL)
+  Bar <- new_class("Bar", Foo, package = NULL)
+  # `z` is not used for dispatch; the dispatch arguments are S7 objects, which
+  # deparse() can't print on older versions of R.
+  foo := new_generic(c("x", "y"), function(x, y, ..., z = 1) S7_dispatch())
+  method(foo, list(Foo, Foo)) <- function(x, y, ..., z = 1) stop("boom")
+
+  get_call <- function(code) conditionCall(tryCatch(code, error = identity))
+  expected <- "`method(foo, list(Foo, Foo))`(...)"
+
+  expect_identical(deparse1(get_call(foo(Foo(), Foo()))), expected)
+  expect_identical(deparse1(get_call(foo(Foo(), Foo(), 1, z = 2))), expected)
+  expect_identical(rlang::as_label(get_call(foo(Foo(), Foo()))), expected)
+  expect_identical(
+    rlang::as_label(get_call(foo(Foo(), Foo(), 1, z = Foo()))),
+    expected
+  )
+
+  # super() inlines the S7 value in the method call
+  expect_identical(
+    deparse1(get_call(foo(super(Bar(), Foo), Foo()))),
+    expected
+  )
+  expect_identical(
+    rlang::as_label(get_call(foo(Foo(), super(Bar(), Foo), z = Foo()))),
+    expected
+  )
+})
+
+test_that("dispatching through `...` preserves method arguments", {
+  Foo <- new_class("Foo")
+  foo := new_generic(c("x", "y"), function(x, y, ..., z = x) S7_dispatch())
+  method(foo, list(Foo, class_numeric)) <- function(x, y, ..., z = x) {
+    list(
+      substitute(x),
+      substitute(y),
+      substitute(z),
+      substitute(list(...)),
+      names(list(...)),
+      missing(z),
+      nargs()
+    )
+  }
+  x <- Foo()
+  nn <- 3
+  forward <- function(obj, n, ...) foo(obj, n, ...)
+
+  expect_identical(
+    foo(x, 1 + 2, k = 3, 4 * 5, z = x),
+    list(
+      quote(x),
+      quote(1 + 2),
+      quote(x),
+      quote(list(k = 3, 4 * 5)),
+      c("k", ""),
+      FALSE,
+      5L
+    )
+  )
+  expect_identical(
+    forward(x, nn, a = 1)[c(1, 2, 4)],
+    list(quote(obj), quote(n), quote(list(a = 1)))
+  )
+  expect_identical(foo(x, 1)[c(3, 6)], list(quote(x), FALSE))
+
+  # The generic's own `...` is restored after dispatching
+  bar := new_generic("x", function(x, ...) {
+    res <- S7_dispatch()
+    list(res, ...length(), names(list(...)))
+  })
+  method(bar, class_numeric) <- function(x, ...) ...length()
+  expect_identical(bar(1, 2, a = 3), list(2L, 2L, c("", "a")))
+  expect_identical(bar(1), list(0L, 0L, NULL))
+})
