@@ -18,21 +18,64 @@ First, add `S7` to the `Imports` field of your `DESCRIPTION`. We then
 recommend importing all S7 functions into your package `NAMESPACE` with
 `import(S7)`, or, if you’re using roxygen2, `@import S7`.
 
-Next, create a `.onLoad()` in `zzz.R` that calls
-[`methods_register()`](https://rconsortium.github.io/S7/reference/methods_register.md):
+If your package also imports rlang or data.table, import `:=` from only
+S7. Otherwise, R warns that one import replaces the other when it loads
+your package. For example, to import all of rlang except `:=` with
+roxygen2:
+
+``` r
+
+#' @import S7
+#' @import rlang, except = ":="
+NULL
+```
+
+Use the same `except` argument when importing data.table.
+
+Next, create a `zzz.R` with a `.onLoad()` that calls
+[`S7_on_load()`](https://rconsortium.github.io/S7/reference/S7_on_load.md),
+an `.onUnload()` that calls
+[`S7_on_unload()`](https://rconsortium.github.io/S7/reference/S7_on_load.md),
+and a top-level call to
+[`S7_on_build()`](https://rconsortium.github.io/S7/reference/S7_on_load.md):
 
 ``` r
 
 .onLoad <- function(...) {
-  S7::methods_register()
+  S7::S7_on_load()
 }
+
+.onUnload <- function(...) {
+  S7::S7_on_unload()
+}
+
+S7::S7_on_build()
 ```
 
-This is S7’s way of registering methods, rather than using export
-directives in your `NAMESPACE` like S3 and S4 do. This is only strictly
-necessary if you are registering methods for generics in other packages,
-but there’s no harm in adding it and it ensures that you won’t forget
-later.
+[`S7_on_load()`](https://rconsortium.github.io/S7/reference/S7_on_load.md)
+is S7’s way of registering methods, rather than using export directives
+in your `NAMESPACE` like S3 and S4 do. This is only strictly necessary
+if you are registering methods for generics in other packages, but
+there’s no harm in adding it and it ensures that you won’t forget later.
+
+[`S7_on_unload()`](https://rconsortium.github.io/S7/reference/S7_on_load.md)
+cleans up after
+[`S7_on_load()`](https://rconsortium.github.io/S7/reference/S7_on_load.md):
+it unregisters methods that your package registered, if they are still
+active, and removes hooks, so unloading your package doesn’t leave stale
+state behind.
+
+[`S7_on_build()`](https://rconsortium.github.io/S7/reference/S7_on_load.md)
+cleans up after `method<-`. Because `method<-` is a replacement
+function, `method(generic, class) <- fun` is evaluated as
+`generic <- method<-(generic, class, fun)`, which would otherwise leave
+a copy of `generic` in your namespace. When `generic` belongs to another
+package, `method<-` returns a sentinel value instead of the generic, and
+[`S7_on_build()`](https://rconsortium.github.io/S7/reference/S7_on_load.md)
+removes these sentinels from your namespace when the package is built.
+It must be called at the top level of `zzz.R` (i.e. *not* inside
+`.onLoad()`), after all your methods have been registered; since `zzz.R`
+is loaded last, this is usually automatic.
 
 ## Classes
 
@@ -68,6 +111,29 @@ you will need to use the `DESCRIPTION` Collate field (or the equivalent
 roxygen2 `@include` tag) to ensure the files are loaded in the correct
 order.
 
+### Methods for suggested packages
+
+Use
+[`new_external_generic()`](https://rconsortium.github.io/S7/reference/new_external_generic.md)
+and
+[`new_external_class()`](https://rconsortium.github.io/S7/reference/new_external_class.md)
+to register methods for S7 generics and classes from suggested packages,
+without taking a hard dependency:
+
+``` r
+
+TheirClass <- new_external_class("theirpkg", "TheirClass")
+method(my_generic, TheirClass) <- function(x) { ... }
+
+their_generic <- new_external_generic("theirpkg", "their_generic", "x")
+method(their_generic, MyClass) <- function(x) { ... }
+```
+
+S7 will register these methods automatically when the suggested package
+is loaded, via
+[`S7_on_load()`](https://rconsortium.github.io/S7/reference/S7_on_load.md)
+as described above.
+
 ## Backward compatibility
 
 ### S3
@@ -79,7 +145,7 @@ which means you’ll need to wrap the method name in `` ` ``:
 
 ``` r
 
-Foo <- new_class("Foo", package = "S7")
+Foo := new_class(package = "S7")
 `length.S7::Foo` <- function(x) 10
 length(Foo())
 #> [1] 10

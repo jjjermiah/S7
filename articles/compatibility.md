@@ -14,7 +14,7 @@ S7 objects *are* S3 objects, because S7 is implemented on top of S3.
 There are two main differences between an S7 object and an S3 object:
 
 - As well as the `class` attribute possessed by S3 objects, S7 objects
-  have an additional `S7_class` attribute that contains the object that
+  have an additional `_S7_class` attribute that contains the object that
   defines the class.
 
 - S7 objects have properties; S3 objects have attributes. Properties are
@@ -39,7 +39,7 @@ classes, and S3 dispatch will operate on them normally.
 
 ``` r
 
-Foo <- new_class("Foo", package = "Bar")
+Foo := new_class(package = "Bar")
 class(Foo())
 #> [1] "Bar::Foo"  "S7_object"
 
@@ -64,7 +64,7 @@ methods (typically in other packages) to continue to work, add a
 
 ``` r
 
-foo <- new_generic("foo", "x")
+foo := new_generic("x")
 
 # Default method dispatches to S3
 method(foo, class_any) <- function(x, ...) {
@@ -99,20 +99,20 @@ rle <- function(x) {
   }
   n <- length(x)
   if (n == 0L) {
-    new_rle(integer(), x)
+    Rle(integer(), x)
   } else {
     y <- x[-1L] != x[-n]
     i <- c(which(y | is.na(y)), n)
-    new_rle(diff(c(0L, i)), x[i])
+    Rle(diff(c(0L, i)), x[i])
   }
 }
-new_rle <- function(lengths, values) {
+Rle <- function(lengths, values) {
   structure(
     list(
       lengths = lengths,
       values = values
     ),
-    class = "rle"
+    class = "Rle"
   )
 }
 ```
@@ -123,16 +123,16 @@ using a constructor to enforce the structure:
 
 ``` r
 
-new_rle <- new_class("rle",
+Rle := new_class(
   parent = class_list,
   constructor = function(lengths, values) {
     new_object(list(lengths = lengths, values = values))
   }
 )
 rle(1:10)
-#> Run Length Encoding
-#>   lengths: int [1:10] 1 1 1 1 1 1 1 1 1 1
-#>   values : int [1:10] 1 2 3 4 5 6 7 8 9 10
+#> <Rle> List of 2
+#>  $ lengths: int [1:10] 1 1 1 1 1 1 1 1 1 1
+#>  $ values : int [1:10] 1 2 3 4 5 6 7 8 9 10
 ```
 
 Alternatively you could convert it to the most natural representation
@@ -140,22 +140,21 @@ using S7:
 
 ``` r
 
-new_rle <- new_class("rle", properties = list(
+Rle := new_class(properties = list(
   lengths = class_integer,
   values = class_atomic
 ))
 ```
 
-To allow existing methods to work you’ll need to override `$` to access
-properties instead of list elements:
+To allow existing code that uses `$` to keep working, like
+[`inverse.rle()`](https://rdrr.io/r/base/rle.html), you’ll need to
+override `$` to access properties instead of list elements:
 
 ``` r
 
-method(`$`, new_rle) <- prop
-rle(1:10)
-#> Run Length Encoding
-#>   lengths: int [1:10] 1 1 1 1 1 1 1 1 1 1
-#>   values : int [1:10] 1 2 3 4 5 6 7 8 9 10
+method(`$`, Rle) <- prop
+inverse.rle(rle(1:10))
+#>  [1]  1  2  3  4  5  6  7  8  9 10
 ```
 
 The chief disadvantage of this approach is any subclasses will need to
@@ -163,18 +162,175 @@ be converted to S7 as well.
 
 ## S4
 
-S7 properties are equivalent to S4 slots. The chief difference is that
-they can be dynamic.
+S7 properties play a role similar to S4 slots. The chief difference is
+that S7 properties can be dynamic, while S4 slots are stored fields with
+a declared S4 class.
 
-- S7 classes can not extend S4 classes
-- S4 classes can extend S3 classes
-- S7 can register methods for S4 generics and S4 classes
+S7 and S4 can interoperate in both directions:
+
+- S7 classes can extend S4 classes.
+- S4 classes can extend S7 classes.
+- S7 can register methods for S4 generics and S4 classes.
+
+### S7 classes that extend S4 classes
+
+To extend an S4 class, supply its class definition or class generator as
+the `parent` of a new S7 class. The S4 parent slots become S7 properties
+on the new class, and
+[`new_class()`](https://rconsortium.github.io/S7/reference/new_class.md)
+automatically registers the S7 class with S4.
+
+``` r
+
+methods::setClass("S4Point",
+  slots = c(x = "numeric", y = "numeric")
+)
+
+ColoredPoint <- new_class("ColoredPoint",
+  parent = methods::getClass("S4Point"),
+  properties = list(color = class_character)
+)
+
+pt <- ColoredPoint(x = 1, y = 2, color = "red")
+pt@x
+#> [1] 1
+pt@color
+#> [1] "red"
+methods::is(pt, "S4Point")
+#> [1] TRUE
+```
+
+S4 dispatch follows the S4 parent hierarchy, so S4 methods defined for
+the parent can be called on the S7 child.
+
+``` r
+
+methods::setGeneric("radius", function(x) standardGeneric("radius"))
+#> [1] "radius"
+methods::setMethod("radius", "S4Point", function(x) {
+  sqrt(x@x^2 + x@y^2)
+})
+
+radius(pt)
+#> [1] 2.236068
+```
+
+S4 code that updates an existing object should use `initialize()` rather
+than constructing a new object from `class(x)`. The S7 `initialize()`
+method accepts stored S7 properties and S4 slots, and later arguments
+override earlier ones.
+
+``` r
+
+pt <- methods::initialize(pt, x = 3, color = "blue")
+pt@x
+#> [1] 3
+pt@color
+#> [1] "blue"
+```
+
+There are a few important caveats:
+
+- An S7 object that directly extends S4 is represented as an S3
+  old-class object, so `isS4(pt)` is `FALSE`. Use
+  [`methods::is()`](https://rdrr.io/r/methods/is.html) to ask about S4
+  inheritance.
+- The class vector is not scalar. S4 code that needs one primary class
+  name should use `class(x)[1L]`, or `methods::class1(x)` when
+  available.
+- [`methods::slot()`](https://rdrr.io/r/methods/slot.html) and
+  `methods::slot<-()` can read and write stored properties, but they
+  bypass custom S7 getters, setters, and ordinary S7 validation. Call
+  [`methods::validObject()`](https://rdrr.io/r/methods/validObject.html)
+  after direct slot updates when the object should satisfy the S7
+  contract.
+- Properties with custom getters or setters cannot cross the S4
+  inheritance boundary as S4 slots.
+- `NULL` properties are stored using the same sentinel that S4 uses for
+  `NULL` slots.
+  [`prop()`](https://rconsortium.github.io/S7/reference/prop.md), `@`,
+  and [`methods::slot()`](https://rdrr.io/r/methods/slot.html) translate
+  this back to `NULL`; raw attributes should be treated as an
+  implementation detail.
+
+### S4 classes that extend S7 classes
+
+After calling
+[`S4_register()`](https://rconsortium.github.io/S7/reference/S4_register.md),
+use
+[`S4_contains()`](https://rconsortium.github.io/S7/reference/S4_register.md)
+when an S4 class should extend an S7 class. It returns the virtual S4
+class name for `methods::setClass(contains = )`. This class exposes
+stored S7 properties as formal S4 slots and carries the `_S7_class` slot
+that S7 uses for dispatch and validation.
+
+``` r
+
+Sample <- new_class("Sample",
+  properties = list(
+    name = class_character,
+    score = class_numeric
+  ),
+  validator = function(self) {
+    if (length(self@score) != 1) {
+      "@score must have length 1"
+    } else if (self@score < 0) {
+      "@score must be non-negative"
+    }
+  }
+)
+
+S4_register(Sample)
+Sample_S4 <- S4_contains(Sample)
+methods::setClass("ReplicatedSample",
+  contains = Sample_S4,
+  slots = c(replicate = "integer")
+)
+
+rs <- methods::new("ReplicatedSample",
+  name = "A",
+  score = 3,
+  replicate = 1L
+)
+
+isS4(rs)
+#> [1] TRUE
+rs@name
+#> [1] "A"
+prop(rs, "score")
+#> [1] 3
+methods::validObject(rs)
+#> [1] TRUE
+```
+
+S7 dispatch still sees the S7 class, even though the concrete object is
+an S4 object.
+
+``` r
+
+sample_label <- new_generic("sample_label", "x")
+method(sample_label, Sample) <- function(x) {
+  paste0(x@name, ": ", x@score)
+}
+
+sample_label(rs)
+#> [1] "A: 3"
+```
+
+The class returned by
+[`S4_contains()`](https://rconsortium.github.io/S7/reference/S4_register.md)
+is a compatibility layer, not a user-facing class. Do not instantiate it
+directly; use it only as a superclass for another S4 class. Since S4
+subclasses are real S4 objects, S4 code can access the S7 properties as
+slots. This is necessary for compatibility, but it also means S4 code
+can bypass S7 property setters until validation is run.
 
 ### Unions
 
-S4 unions are automatically converted to S7 unions. There’s an important
-difference in the way that class unions are handled in S4 and S7. In S4,
-they’re handled at method dispatch time, so when you create
+S4 unions are automatically converted to S7 unions when they are used as
+S7 property classes. There’s an important difference in the way that
+class unions are handled in S4 and S7. In S4, they’re handled at method
+dispatch time, so when you create
 `setUnion("u1", c("class1", "class2"))`, `class1` and `class2` now
 extend `u1`. In S7, unions are handled at method registration time so
 that registering a method for a union is just short-hand for registering
@@ -182,11 +338,11 @@ a method for each of the classes.
 
 ``` r
 
-Class1 <- new_class("Class1")
-Class2 <- new_class("Class2")
+Class1 := new_class()
+Class2 := new_class()
 Union1 <- new_union(Class1, Class2)
 
-foo <- new_generic("foo", "x")
+foo := new_generic("x")
 method(foo, Union1) <- function(x) ""
 foo
 #> <S7_generic> foo(x, ...) with 2 methods:
@@ -195,4 +351,7 @@ foo
 ```
 
 S7 unions allow you to restrict the type of a property in the same way
-that S4 unions allow you to restrict the type of a slot.
+that S4 unions allow you to restrict the type of a slot. S7 unions can
+also be registered with
+[`S4_register()`](https://rconsortium.github.io/S7/reference/S4_register.md)
+for use in S4 slots and method signatures.

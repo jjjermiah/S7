@@ -33,6 +33,10 @@ that:
 - The method can contain arguments that the generic does not, as long as
   the generic includes `…` in the argument list.
 
+Dispatch arguments can have defaults in the generic. When an argument is
+omitted, S7 evaluates its default and dispatches on that value’s class.
+If no value or default is available, S7 dispatches on `class_missing`.
+
 ### Generic with dots; method without dots
 
 The default generic includes `…` but generally the methods should not.
@@ -42,7 +46,7 @@ implementation of [`mean()`](https://rdrr.io/r/base/mean.html):
 
 ``` r
 
-mean <- new_generic("mean", "x")
+mean := new_generic("x")
 method(mean, class_numeric) <- function(x) sum(x) / length(x)
 ```
 
@@ -81,7 +85,7 @@ For example, imagine a simple print method like this:
 
 ``` r
 
-simple_print <- new_generic("simple_print", "x")
+simple_print := new_generic("x")
 method(simple_print, class_double) <- function(x, digits = 3) {}
 method(simple_print, class_character) <- function(x, max_length = 100) {}
 ```
@@ -149,7 +153,7 @@ with precisely defined semantics. A good example of such a function is
 
 ``` r
 
-length <- new_generic("length", "x", function(x) {
+length := new_generic("x", function(x) {
   S7_dispatch()
 })
 ```
@@ -166,7 +170,7 @@ and allow it to automatically generate the body of the generic:
 
 ``` r
 
-display <- new_generic("display", "x")
+display := new_generic("x")
 S7_data(display)
 #> function (x, ...) 
 #> S7::S7_dispatch()
@@ -196,7 +200,7 @@ add additional arguments that lack default values:
 
 ``` r
 
-foo <- new_generic("foo", "x", function(x, y, ...) {
+foo := new_generic("x", function(x, y, ...) {
   S7_dispatch()
 })
 ```
@@ -225,7 +229,7 @@ function in the future.
 
 ``` r
 
-mean <- new_generic("mean", "x", function(x, ..., na.rm = TRUE) {
+mean := new_generic("x", function(x, ..., na.rm = TRUE) {
   S7_dispatch()
 })
 method(mean, class_integer) <- function(x, na.rm = TRUE) {
@@ -258,7 +262,7 @@ verify that `na.rm` was correctly specified:
 
 ``` r
 
-mean <- new_generic("mean", "x", function(x, ..., na.rm = TRUE) {
+mean := new_generic("x", function(x, ..., na.rm = TRUE) {
   if (!identical(na.rm, TRUE) && !identical(na.rm = FALSE)) {
     stop("`na.rm` must be either TRUE or FALSE")
   }
@@ -284,7 +288,7 @@ for numbers:
 
 ``` r
 
-mean <- new_generic("mean", "x")
+mean := new_generic("x")
 method(mean, class_numeric) <- function(x) {
   sum(x) / length(x)
 }
@@ -296,7 +300,7 @@ And a Date class:
 
 ``` r
 
-date <- new_class("date", parent = class_double)
+date := new_class(parent = class_double)
 # Cheat by using the existing base .Date class
 method(print, date) <- function(x) print(.Date(x))
 date(c(1, 10, 100))
@@ -357,15 +361,15 @@ extend it to teach our pets how to speak multiple languages:
 
 ``` r
 
-Pet <- new_class("Pet")
-Dog <- new_class("Dog", Pet)
-Cat <- new_class("Cat", Pet)
+Pet := new_class()
+Dog := new_class(Pet)
+Cat := new_class(Pet)
 
-Language <- new_class("Language")
-English <- new_class("English", Language)
-French <- new_class("French", Language)
+Language := new_class()
+English := new_class(Language)
+French := new_class(Language)
 
-speak <- new_generic("speak", c("x", "y"))
+speak := new_generic(c("x", "y"))
 method(speak, list(Dog, English)) <- function(x, y) "Woof"
 method(speak, list(Cat, English)) <- function(x, y) "Meow"
 method(speak, list(Dog, French)) <- function(x, y) "Ouaf Ouaf"
@@ -388,5 +392,5 @@ multiple dispatch:
 - [`class_any()`](https://rconsortium.github.io/S7/reference/class_any.md)
   will match any class
 - [`class_missing()`](https://rconsortium.github.io/S7/reference/class_missing.md)
-  will match a missing argument (i.e. not `NA`, but an argument that was
-  not supplied)
+  will match an argument with no available value. Omitted arguments with
+  defaults dispatch on the default’s class.

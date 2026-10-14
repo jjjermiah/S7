@@ -29,6 +29,7 @@ Learn more in vignette("classes-objects")'></head><body>
     <li><a class="dropdown-item" href="../articles/classes-objects.html">Classes and objects</a></li>
     <li><a class="dropdown-item" href="../articles/compatibility.html">Compatibility with S3 and S4</a></li>
     <li><a class="dropdown-item" href="../articles/packages.html">Using S7 in a package</a></li>
+    <li><a class="dropdown-item" href="../articles/evolution.html">Evolving S7 classes and generics</a></li>
     <li><a class="dropdown-item" href="../articles/motivation.html">Motivation for S7</a></li>
     <li><a class="dropdown-item" href="../articles/performance.html">Performance</a></li>
     <li><hr class="dropdown-divider"></li>
@@ -77,7 +78,7 @@ when an object is passed to a generic.</p>
 <span>  validator <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">new_object</span><span class="op">(</span><span class="va">.parent</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">new_object</span><span class="op">(</span><span class="va">`_parent`</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -88,16 +89,22 @@ when an object is passed to a generic.</p>
 <dd><p>The name of the class, as a string. (We recommend using
 CamelCase for S7 class names, but it is not required.)</p>
 <p>The result of calling <code>new_class()</code> should always be assigned to a variable
-with this name, i.e. <code>Foo &lt;- new_class("Foo")</code>. This object both represents
-the class and is used to construct new instances of the class.</p></dd>
+with this name, i.e. <code>Foo &lt;- new_class("Foo", ...)</code> or
+<code>Foo := new_class(...)</code>. This object both represents the class and is used
+to construct new instances of the class.</p></dd>
 
 
 <dt id="arg-parent">parent<a class="anchor" aria-label="anchor" href="#arg-parent"></a></dt>
 <dd><p>The parent class to inherit behavior from.
-There are three options:</p><ul><li><p>An S7 class, like <a href="S7_object.html">S7_object</a>.</p></li>
+There are four options:</p><ul><li><p>An S7 class, like <a href="S7_object.html">S7_object</a>.</p></li>
+<li><p>An S4 class, like the result of <code><a href="https://rdrr.io/r/methods/getClass.html" class="external-link">methods::getClass()</a></code>.</p></li>
 <li><p>An S3 class wrapped by <code><a href="new_S3_class.html">new_S3_class()</a></code>.</p></li>
 <li><p>A base type, like <a href="base_classes.html">class_logical</a>, <a href="base_classes.html">class_integer</a>, etc.</p></li>
-</ul></dd>
+</ul><p>When defining a class in a package with an S7 parent from another package,
+the parent's properties are captured when your class is defined, but the
+default constructor calls the parent's installed constructor at run time.
+Parent arguments are forwarded through <code>...</code>, followed by named arguments
+for the subclass's own properties.</p></dd>
 
 
 <dt id="arg-package">package<a class="anchor" aria-label="anchor" href="#arg-package"></a></dt>
@@ -124,8 +131,10 @@ instantiated.</p></dd>
 on the default constructor, which will generate a function with one
 argument for each property.</p>
 <p>A custom constructor should call <code>new_object()</code> to create the S7 object.
-The first argument, <code>.data</code>, should be an instance of the parent class
-(if used). The subsequent arguments are used to set the properties.</p></dd>
+<code>new_class()</code> automatically associates a custom constructor with its class,
+so no additional class argument is needed. The first argument to
+<code>new_object()</code>, <code>_parent</code>, should be an instance of the parent class (if
+used). The subsequent arguments are used to set the properties.</p></dd>
 
 
 <dt id="arg-validator">validator<a class="anchor" aria-label="anchor" href="#arg-validator"></a></dt>
@@ -145,9 +154,16 @@ problem, using <code>@prop_name</code> to describe where the problem lies.</p>
 suppress validation when needed.</p></dd>
 
 
-<dt id="arg--parent-">.parent, ...<a class="anchor" aria-label="anchor" href="#arg--parent-"></a></dt>
+<dt id="arg--parent-">_parent, ...<a class="anchor" aria-label="anchor" href="#arg--parent-"></a></dt>
 <dd><p>Parent object and named properties used to construct the
-object.</p></dd>
+object.</p>
+<p>When the inheritance chain ends at <a href="S7_object.html">S7_object</a>, only
+attributes corresponding to its properties are copied from <code>_parent</code>.
+For S3 parents, <code><a href="new_S3_class.html">new_S3_class()</a></code> can declare the attributes to preserve.
+Attributes of underlying base data are preserved.</p>
+<p>As a convenience, if <code>...</code> is a single unnamed list, then the elements of
+that list are used as the properties. This makes it easy to
+programmatically construct an object from a list of property values.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -155,11 +171,24 @@ object.</p></dd>
     <p>A object constructor, a function that can be used to create objects
 of the given class.</p>
     </div>
+    <div class="section level2">
+    <h2 id="s-compatibility">S4 compatibility<a class="anchor" aria-label="anchor" href="#s-compatibility"></a></h2>
+
+
+<p><code>new_class()</code> can use an S4 class definition or class generator as its
+<code>parent</code>. S4 parent slots become S7 properties, the class is registered with
+S4 automatically, and S4 generics can dispatch through the S4 parent.</p>
+<p>S7 objects that directly extend S4 are represented as S3 old-class objects,
+so <code><a href="https://rdrr.io/r/base/isS4.html" class="external-link">isS4()</a></code> is <code>FALSE</code> even though <code><a href="https://rdrr.io/r/methods/is.html" class="external-link">methods::is()</a></code> and S4 dispatch see the
+S4 parent. S4 classes can extend S7 classes by calling
+<code><a href="S4_register.html">S4_contains()</a></code> in <code>methods::setClass(contains = )</code>.</p>
+<p>See <code><a href="../articles/compatibility.html">vignette("compatibility")</a></code> for examples and caveats.</p>
+    </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># Create an class that represents a range using a numeric start and end</span></span></span>
-<span class="r-in"><span><span class="va">Range</span> <span class="op">&lt;-</span> <span class="fu">new_class</span><span class="op">(</span><span class="st">"Range"</span>,</span></span>
+<span class="r-in"><span><span class="va">Range</span> <span class="op">:=</span> <span class="fu">new_class</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  properties <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
 <span class="r-in"><span>    start <span class="op">=</span> <span class="va">class_numeric</span>,</span></span>
 <span class="r-in"><span>    end <span class="op">=</span> <span class="va">class_numeric</span></span></span>
@@ -185,7 +214,7 @@ of the given class.</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># But we might also want to use a validator to ensure that start and end</span></span></span>
 <span class="r-in"><span><span class="co"># are length 1, and that start is &lt; end</span></span></span>
-<span class="r-in"><span><span class="va">Range</span> <span class="op">&lt;-</span> <span class="fu">new_class</span><span class="op">(</span><span class="st">"Range"</span>,</span></span>
+<span class="r-in"><span><span class="va">Range</span> <span class="op">:=</span> <span class="fu">new_class</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  properties <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
 <span class="r-in"><span>    start <span class="op">=</span> <span class="va">class_numeric</span>,</span></span>
 <span class="r-in"><span>    end <span class="op">=</span> <span class="va">class_numeric</span></span></span>
@@ -223,7 +252,7 @@ of the given class.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

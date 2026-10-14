@@ -38,10 +38,21 @@ new_property(
 
 - getter:
 
-  An optional function used to get the value. The function should take
-  `self` as its sole argument and return the value. If you supply a
-  `getter`, you are responsible for ensuring that it returns an object
-  of the correct `class`; it will not be validated automatically.
+  An optional function used to get the value. There are two supported
+  forms:
+
+  - `function(self)` is supplied the object.
+
+  - `function(self, name)` also gets the property name being accessed,
+    which makes it easy to reuse the same getter for multiple
+    properties.
+
+  A getter can read its property's stored value with `prop(self, name)`;
+  this does not call the getter again.
+
+  If you supply a `getter`, you are responsible for ensuring that it
+  returns an object of the correct `class`; it will not be validated
+  automatically.
 
   If a property has a getter but doesn't have a setter, it is read only.
 
@@ -72,18 +83,27 @@ new_property(
 - default:
 
   When an object is created and the property is not supplied, what
-  should it default to?
+  should it default to? There are four options:
 
-  If `NULL`, it defaults to the "empty" instance of `class`. For base
-  vector types, this will be a zero length vector, e.g.
-  [`character()`](https://rdrr.io/r/base/character.html) for
-  [`class_character()`](https://rconsortium.github.io/S7/reference/base_classes.md).
-  For S7 classes, this will be a call to the constructor
+  - A simple scalar (e.g. `1L`, `"x"`, `TRUE`).
 
-  This can also be a
-  [`quote()`](https://rdrr.io/r/base/substitute.html)d call, which then
-  becomes a standard function promise in the default constructor,
-  evaluated when the object is constructed.
+  - An empty vector without attributes (e.g.
+    [`integer()`](https://rdrr.io/r/base/integer.html),
+    [`list()`](https://rdrr.io/r/base/list.html)).
+
+  - A [`quote()`](https://rdrr.io/r/base/substitute.html)d call. This
+    will be evaluated when the object is constructed and should be used
+    for any thing more complicated like a named vector or a function
+    call.
+
+  - `NULL`, it defaults to the "empty" instance of `class`. For base
+    vector types, this will be a zero length vector, e.g.
+    [`character()`](https://rdrr.io/r/base/character.html) for
+    [`class_character()`](https://rconsortium.github.io/S7/reference/base_classes.md).
+    For S7 classes, this will be a call to the constructor.
+
+  Anything else will generate a warning, which will become an error in a
+  future release.
 
 - name:
 
@@ -91,6 +111,9 @@ new_property(
   to set this here, as it's more convenient to supply as the element
   name when defining a list of properties. If both `name` and a
   list-name are supplied, the list-name will be used.
+
+  Property names must not start with `_`; these properties are reserved
+  for internal use by S7.
 
 ## Value
 
@@ -100,7 +123,7 @@ An S7 property, i.e. a list with class `S7_property`.
 
 ``` r
 # Simple properties store data inside an object
-Pizza <- new_class("Pizza", properties = list(
+Pizza := new_class(properties = list(
   slices = new_property(class_numeric, default = 10),
   special = new_property(NULL | class_character)
 ))
@@ -120,14 +143,14 @@ your_pizza@special
 #> NULL
 
 # Dynamic properties can compute on demand
-Clock <- new_class("Clock", properties = list(
+Clock := new_class(properties = list(
   now = new_property(getter = function(self) Sys.time())
 ))
 my_clock <- Clock()
 my_clock@now; Sys.sleep(1)
-#> [1] "2026-06-03 17:40:33 UTC"
+#> [1] "2026-10-14 18:38:48 UTC"
 my_clock@now
-#> [1] "2026-06-03 17:40:34 UTC"
+#> [1] "2026-10-14 18:38:49 UTC"
 # This property is read only, because there is a 'getter' but not a 'setter'
 try(my_clock@now <- 10)
 #> Error in `<Clock>@now`() : Can't set read-only property.

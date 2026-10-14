@@ -26,7 +26,7 @@ In the following example we create a `Range` class that enforces that
 
 ``` r
 
-Range <- new_class("Range",
+Range := new_class(
   properties = list(
     start = class_double,
     end = class_double
@@ -154,7 +154,7 @@ For example, the property definition of range above is shorthand for:
 
 ``` r
 
-Range <- new_class("Range",
+Range := new_class(
   properties = list(
     start = new_property(class_double),
     end = new_property(class_double)
@@ -184,7 +184,7 @@ prop_number <- new_property(
   }
 )
 
-Range <- new_class("Range",
+Range := new_class(
   properties = list(
     start = prop_number,
     end = prop_number
@@ -225,7 +225,7 @@ create a class that can be constructed with no arguments:
 
 ``` r
 
-Empty <- new_class("Empty",
+Empty := new_class(
   properties = list(
     x = class_double,
     y = class_character,
@@ -244,7 +244,7 @@ instances. You can instead provide your own defaults by using the
 
 ``` r
 
-Empty <- new_class("Empty",
+Empty := new_class(
   properties = list(
     x = new_property(class_numeric, default = 0),
     y = new_property(class_character, default = ""),
@@ -263,7 +263,7 @@ constructor, evaluated at the time the object is constructed.
 
 ``` r
 
-Stopwatch <- new_class("Stopwatch", properties = list(
+Stopwatch := new_class(properties = list(
   start_time = new_property(
     class = class_POSIXct,
     default = quote(Sys.time())
@@ -292,7 +292,7 @@ dynamically compute the value of a property by defining a `getter`:
 
 ``` r
 
-Range <- new_class("Range",
+Range := new_class(
   properties = list(
     start = class_double,
     end = class_double,
@@ -332,7 +332,7 @@ to be set, by modifying the `@end` of the vector:
 
 ``` r
 
-Range <- new_class("Range",
+Range := new_class(
   properties = list(
     start = class_double,
     end = class_double,
@@ -374,28 +374,17 @@ many common patterns of properties.
 
 #### Deprecated properties
 
-A `setter` + `getter` can be used to to deprecate a property:
+Use
+[`deprecated_property()`](https://rconsortium.github.io/S7/reference/deprecated_property.md)
+when renaming a property so existing code can still read and write the
+old name. Reading it or assigning a different value warns users to use
+the replacement:
 
 ``` r
 
-Person <- new_class("Person", properties = list(
- first_name = class_character,
- firstName = new_property(
-    class_character,
-    default = quote(first_name),
-    getter = function(self) {
-      warning("@firstName is deprecated; please use @first_name instead", call. = FALSE)
-      self@first_name
-    },
-    setter = function(self, value) {
-      if (identical(value, self@first_name)) {
-        return(self)
-      }
-      warning("@firstName is deprecated; please use @first_name instead", call. = FALSE)
-      self@first_name <- value
-      self
-    }
-  )
+Person := new_class(properties = list(
+  first_name = class_character,
+  deprecated_property("firstName", new = "first_name", when = "1.1.0")
 ))
 
 args(Person)
@@ -403,20 +392,37 @@ args(Person)
 #> NULL
 
 hadley <- Person(firstName = "Hadley")
-#> Warning: @firstName is deprecated; please use @first_name instead
+#> Warning: `<Person>@firstName` was deprecated in version 1.1.0.
+#> Please use `<Person>@first_name` instead.
 
 hadley <- Person(first_name = "Hadley") # no warning
 
 hadley@firstName
-#> Warning: @firstName is deprecated; please use @first_name instead
+#> Warning: `<Person>@firstName` was deprecated in version 1.1.0.
+#> Please use `<Person>@first_name` instead.
 #> [1] "Hadley"
 
 hadley@firstName <- "John"
-#> Warning: @firstName is deprecated; please use @first_name instead
+#> Warning: `<Person>@firstName` was deprecated in version 1.1.0.
+#> Please use `<Person>@first_name` instead.
 
 hadley@first_name  # no warning
 #> [1] "John"
 ```
+
+The old constructor argument defaults to the new one, so
+`Person(first_name = "Hadley")` is silent. Explicitly supplying the same
+value, as in `Person(first_name = "Hadley", firstName = "Hadley")`, is
+also silent. Printing an object omits deprecated properties.
+
+See
+[`?deprecated_property`](https://rconsortium.github.io/S7/reference/deprecated_property.md)
+for deprecating a property without a replacement, preserving validation,
+and updating packages that define subclasses. Use
+[`deprecated_generic()`](https://rconsortium.github.io/S7/reference/deprecated_generic.md)
+for generics and
+[`deprecated_class()`](https://rconsortium.github.io/S7/reference/deprecated_class.md)
+for classes.
 
 #### Required properties
 
@@ -427,7 +433,7 @@ You can make a property required by the constructor either by:
 
 ``` r
 
-Person <- new_class("Person", properties = list(
+Person := new_class(properties = list(
  name = new_property(
    class_character,
    validator = function(value) {
@@ -452,7 +458,7 @@ Person("Alice")
 
 ``` r
 
-Person <- new_class("Person", properties = list(
+Person := new_class(properties = list(
  name = new_property(
    class_character,
    default = quote(stop("@name is required")))
@@ -473,7 +479,7 @@ custom `setter`.
 
 ``` r
 
-Person <- new_class("Person", properties = list(
+Person := new_class(properties = list(
  birth_date = new_property(
    class_Date,
    setter = function(self, value) {
@@ -507,6 +513,7 @@ Range@constructor
 #>     S7::new_object(S7::S7_object(), start = start, end = end, 
 #>         length = length)
 #> }
+#> <environment: 0x560506295850>
 ```
 
 In most cases, S7’s default constructor will be all you need. However,
@@ -517,7 +524,7 @@ we could do:
 
 ``` r
 
-Range <- new_class("Range",
+Range := new_class(
   properties = list(
     start = class_numeric,
     end = class_numeric
@@ -547,5 +554,21 @@ then you should use
 as the parent here). That argument should be followed by one named
 argument for each property.
 
-There’s one drawback of custom constructors that you should be aware of:
-any subclass will also require a custom constructor.
+A subclass of a class with a custom constructor doesn’t need its own
+custom constructor. Its default constructor takes `...` and forwards it
+to the parent constructor, followed by one named argument for each
+property the subclass adds:
+
+``` r
+
+PositiveRange := new_class(
+  parent = Range,
+  properties = list(positive = class_logical)
+)
+# `...` is forwarded to Range()'s custom constructor
+PositiveRange(c(10, 5, 0, 2, 5, 7), positive = TRUE)
+#> <PositiveRange>
+#>  @ start   : num 0
+#>  @ end     : num 10
+#>  @ positive: logi TRUE
+```

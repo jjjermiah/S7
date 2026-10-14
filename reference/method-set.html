@@ -8,7 +8,7 @@ methods for S7 classes on S7 generics, you can also register methods for
 S7 classes on S3 or S4 generics, and S3 or S4 classes on S7 generics.
 But this is not a general method registration function: at least one of
 generic and signature needs to be from S7.
-Note that if you are writing a package, you must call methods_register()
+Note that if you are writing a package, you must call S7_on_load()
 in your .onLoad. This ensures that all methods are dynamically registered
 when needed."><meta property="og:description" content="A generic defines the interface of a function. Once you have created a
 generic with new_generic(), you provide implementations for specific
@@ -19,7 +19,7 @@ methods for S7 classes on S7 generics, you can also register methods for
 S7 classes on S3 or S4 generics, and S3 or S4 classes on S7 generics.
 But this is not a general method registration function: at least one of
 generic and signature needs to be from S7.
-Note that if you are writing a package, you must call methods_register()
+Note that if you are writing a package, you must call S7_on_load()
 in your .onLoad. This ensures that all methods are dynamically registered
 when needed."></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -45,6 +45,7 @@ when needed."></head><body>
     <li><a class="dropdown-item" href="../articles/classes-objects.html">Classes and objects</a></li>
     <li><a class="dropdown-item" href="../articles/compatibility.html">Compatibility with S3 and S4</a></li>
     <li><a class="dropdown-item" href="../articles/packages.html">Using S7 in a package</a></li>
+    <li><a class="dropdown-item" href="../articles/evolution.html">Evolving S7 classes and generics</a></li>
     <li><a class="dropdown-item" href="../articles/motivation.html">Motivation for S7</a></li>
     <li><a class="dropdown-item" href="../articles/performance.html">Performance</a></li>
     <li><hr class="dropdown-divider"></li>
@@ -84,7 +85,7 @@ methods for S7 classes on S7 generics, you can also register methods for
 S7 classes on S3 or S4 generics, and S3 or S4 classes on S7 generics.
 But this is not a general method registration function: at least one of
 <code>generic</code> and <code>signature</code> needs to be from S7.</p>
-<p>Note that if you are writing a package, you must call <code><a href="methods_register.html">methods_register()</a></code>
+<p>Note that if you are writing a package, you must call <code><a href="S7_on_load.html">S7_on_load()</a></code>
 in your <code>.onLoad</code>. This ensures that all methods are dynamically registered
 when needed.</p>
     </div>
@@ -101,7 +102,10 @@ when needed.</p>
 <dl><dt id="arg-generic">generic<a class="anchor" aria-label="anchor" href="#arg-generic"></a></dt>
 <dd><p>A generic function, i.e. an <a href="new_generic.html">S7 generic</a>,
 an <a href="new_external_generic.html">external generic</a>, an <a href="https://rdrr.io/r/base/UseMethod.html" class="external-link">S3 generic</a>,
-or an <a href="https://rdrr.io/r/methods/setGeneric.html" class="external-link">S4 generic</a>.</p></dd>
+or an <a href="https://rdrr.io/r/methods/setGeneric.html" class="external-link">S4 generic</a>.</p>
+<p>Note that because <code>method&lt;-</code> is an assignment function,
+<code>method(pkg::gen, class) &lt;- f</code> will not work. You must either import
+<code>gen</code> into your namespace or use <code><a href="new_external_generic.html">new_external_generic()</a></code>.</p></dd>
 
 
 <dt id="arg-signature">signature<a class="anchor" aria-label="anchor" href="#arg-signature"></a></dt>
@@ -125,13 +129,31 @@ given <code>signature</code>, or <code>NULL</code> to unregister an existing met
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>The <code>generic</code>, invisibly.</p>
+    <p>Usually <code>generic</code>, invisibly.</p>
+<p>When registering a method for a generic that lives in another package
+(an external, S3, or S4 generic), returns a sentinel object instead, to
+avoid embedding a copy of that generic in your package. See
+<code><a href="../articles/packages.html">vignette("packages")</a></code> for details.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="operators">Operators<a class="anchor" aria-label="anchor" href="#operators"></a></h2>
+
+
+<p>Binary operators such as <code>+</code> and <code>-</code> dispatch on <code>e1</code> and <code>e2</code>. To define
+a unary method, use <code>list(Foo, class_missing)</code> as the signature and a
+function with arguments <code>e1</code> and <code>e2</code>; <code>e2</code> will be missing when called.
+This lets unary and binary methods coexist on the same class.</p>
+<p>The <code>!</code> operator is always unary. Use <code>Foo</code> (or <code>list(Foo)</code>) as its
+signature and a function with argument <code>e1</code>.</p>
+<p>If no unary method is registered, the operator falls back to R's base
+behavior for the underlying object. Errors raised inside a registered
+method are propagated.</p>
     </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># Create a generic</span></span></span>
-<span class="r-in"><span><span class="va">bizarro</span> <span class="op">&lt;-</span> <span class="fu"><a href="new_generic.html">new_generic</a></span><span class="op">(</span><span class="st">"bizarro"</span>, <span class="st">"x"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">bizarro</span> <span class="op">:=</span> <span class="fu"><a href="new_generic.html">new_generic</a></span><span class="op">(</span><span class="st">"x"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="co"># Register some methods</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="method.html">method</a></span><span class="op">(</span><span class="va">bizarro</span>, <span class="va">class_numeric</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/rev.html" class="external-link">rev</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="method.html">method</a></span><span class="op">(</span><span class="va">bizarro</span>, <span class="fu"><a href="new_S3_class.html">new_S3_class</a></span><span class="op">(</span><span class="st">"data.frame"</span><span class="op">)</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">{</span></span></span>
@@ -162,7 +184,7 @@ given <code>signature</code>, or <code>NULL</code> to unregister an existing met
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

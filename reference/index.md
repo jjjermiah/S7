@@ -10,6 +10,8 @@
   : Define a new generic
 - [`new_union()`](https://rconsortium.github.io/S7/reference/new_union.md)
   : Define a class union
+- [`` `:=`() ``](https://rconsortium.github.io/S7/reference/named-bind.md)
+  : Create and name an object in one step
 - [`` `method<-`() ``](https://rconsortium.github.io/S7/reference/method-set.md)
   : Register an S7 method for a generic
 - [`S7_inherits()`](https://rconsortium.github.io/S7/reference/S7_inherits.md)
@@ -26,8 +28,7 @@
   : Define a new property
 - [`prop()`](https://rconsortium.github.io/S7/reference/prop.md)
   [`` `prop<-`() ``](https://rconsortium.github.io/S7/reference/prop.md)
-  [`` `@`() ``](https://rconsortium.github.io/S7/reference/prop.md) :
-  Get/set a property
+  : Get/set a property
 - [`prop_names()`](https://rconsortium.github.io/S7/reference/prop_names.md)
   [`prop_exists()`](https://rconsortium.github.io/S7/reference/prop_names.md)
   [`prop_info()`](https://rconsortium.github.io/S7/reference/prop_names.md)
@@ -44,6 +45,8 @@
 
 - [`convert()`](https://rconsortium.github.io/S7/reference/convert.md) :
   Convert an object from one type to another
+- [`convert_lazy()`](https://rconsortium.github.io/S7/reference/convert_lazy.md)
+  : Non-strict conversion
 - [`class_missing`](https://rconsortium.github.io/S7/reference/class_missing.md)
   : Dispatch on a missing argument
 - [`class_any`](https://rconsortium.github.io/S7/reference/class_any.md)
@@ -61,6 +64,15 @@
   : Retrieve the class specification of an object
 - [`S7_class_desc()`](https://rconsortium.github.io/S7/reference/S7_class_desc.md)
   : Format a class specification as a string
+- [`S7_generic_call()`](https://rconsortium.github.io/S7/reference/S7_generic_call.md)
+  [`S7_user_frame()`](https://rconsortium.github.io/S7/reference/S7_generic_call.md)
+  [`S7_generic_fun()`](https://rconsortium.github.io/S7/reference/S7_generic_call.md)
+  : Access the generic call and user frame from within a method
+- [`S7_classes()`](https://rconsortium.github.io/S7/reference/S7_classes.md)
+  [`S7_generics()`](https://rconsortium.github.io/S7/reference/S7_classes.md)
+  : Find S7 classes and generics in an environment
+- [`S7_methods()`](https://rconsortium.github.io/S7/reference/S7_methods.md)
+  : List S7 methods
 
 ## Packages
 
@@ -68,10 +80,27 @@ Functions needed when using S7 within a package. See
 [`vignette("packages")`](https://rconsortium.github.io/S7/articles/packages.md)
 for more details.
 
-- [`methods_register()`](https://rconsortium.github.io/S7/reference/methods_register.md)
-  : Register methods in a package
+- [`S7_on_load()`](https://rconsortium.github.io/S7/reference/S7_on_load.md)
+  [`methods_register()`](https://rconsortium.github.io/S7/reference/S7_on_load.md)
+  [`S7_on_unload()`](https://rconsortium.github.io/S7/reference/S7_on_load.md)
+  [`S7_on_build()`](https://rconsortium.github.io/S7/reference/S7_on_load.md)
+  : Package hooks for S7 methods
+- [`new_external_class()`](https://rconsortium.github.io/S7/reference/new_external_class.md)
+  : Classes in other packages
 - [`new_external_generic()`](https://rconsortium.github.io/S7/reference/new_external_generic.md)
   : Generics in other packages
+
+## Deprecation
+
+Helpers for gracefully retiring generics, classes, and properties: old
+code keeps working, but warns users to update.
+
+- [`deprecated_generic()`](https://rconsortium.github.io/S7/reference/deprecated_generic.md)
+  : Deprecate a generic
+- [`deprecated_class()`](https://rconsortium.github.io/S7/reference/deprecated_class.md)
+  : Deprecate a class
+- [`deprecated_property()`](https://rconsortium.github.io/S7/reference/deprecated_property.md)
+  : Deprecate a property
 
 ## Compatibility
 
@@ -110,4 +139,5 @@ for more details.
 - [`new_S3_class()`](https://rconsortium.github.io/S7/reference/new_S3_class.md)
   : Declare an S3 class
 - [`S4_register()`](https://rconsortium.github.io/S7/reference/S4_register.md)
-  : Register an S7 or S3 class with S4
+  [`S4_contains()`](https://rconsortium.github.io/S7/reference/S4_register.md)
+  : Register an S7, S3, or union class with S4

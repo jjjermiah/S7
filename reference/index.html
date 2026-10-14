@@ -23,6 +23,7 @@
     <li><a class="dropdown-item" href="../articles/classes-objects.html">Classes and objects</a></li>
     <li><a class="dropdown-item" href="../articles/compatibility.html">Compatibility with S3 and S4</a></li>
     <li><a class="dropdown-item" href="../articles/packages.html">Using S7 in a package</a></li>
+    <li><a class="dropdown-item" href="../articles/evolution.html">Evolving S7 classes and generics</a></li>
     <li><a class="dropdown-item" href="../articles/motivation.html">Motivation for S7</a></li>
     <li><a class="dropdown-item" href="../articles/performance.html">Performance</a></li>
     <li><hr class="dropdown-divider"></li>
@@ -83,6 +84,13 @@
 
         <dt>
 
+          <code><a href="named-bind.html">`:=`()</a></code>
+
+        </dt>
+        <dd>Create and name an object in one step</dd>
+
+        <dt>
+
           <code><a href="method-set.html">`method&lt;-`()</a></code>
 
         </dt>
@@ -120,7 +128,7 @@
 
         <dt>
 
-          <code><a href="prop.html">prop()</a></code> <code><a href="prop.html">`prop&lt;-`()</a></code> <code><a href="prop.html">`@`()</a></code>
+          <code><a href="prop.html">prop()</a></code> <code><a href="prop.html">`prop&lt;-`()</a></code>
 
         </dt>
         <dd>Get/set a property</dd>
@@ -161,6 +169,13 @@
 
         </dt>
         <dd>Convert an object from one type to another</dd>
+
+        <dt>
+
+          <code><a href="convert_lazy.html">convert_lazy()</a></code>
+
+        </dt>
+        <dd>Non-strict conversion</dd>
 
         <dt>
 
@@ -219,6 +234,27 @@
 
         </dt>
         <dd>Format a class specification as a string</dd>
+
+        <dt>
+
+          <code><a href="S7_generic_call.html">S7_generic_call()</a></code> <code><a href="S7_generic_call.html">S7_user_frame()</a></code> <code><a href="S7_generic_call.html">S7_generic_fun()</a></code>
+
+        </dt>
+        <dd>Access the generic call and user frame from within a method</dd>
+
+        <dt>
+
+          <code><a href="S7_classes.html">S7_classes()</a></code> <code><a href="S7_classes.html">S7_generics()</a></code>
+
+        </dt>
+        <dd>Find S7 classes and generics in an environment</dd>
+
+        <dt>
+
+          <code><a href="S7_methods.html">S7_methods()</a></code>
+
+        </dt>
+        <dd>List S7 methods</dd>
       </dl></div><div class="section level2">
       <h2 id="packages">Packages<a class="anchor" aria-label="anchor" href="#packages"></a></h2>
 
@@ -231,10 +267,17 @@
 
       <dl><dt>
 
-          <code><a href="methods_register.html">methods_register()</a></code>
+          <code><a href="S7_on_load.html">S7_on_load()</a></code> <code><a href="S7_on_load.html">methods_register()</a></code> <code><a href="S7_on_load.html">S7_on_unload()</a></code> <code><a href="S7_on_load.html">S7_on_build()</a></code>
 
         </dt>
-        <dd>Register methods in a package</dd>
+        <dd>Package hooks for S7 methods</dd>
+
+        <dt>
+
+          <code><a href="new_external_class.html">new_external_class()</a></code>
+
+        </dt>
+        <dd>Classes in other packages</dd>
 
         <dt>
 
@@ -242,6 +285,36 @@
 
         </dt>
         <dd>Generics in other packages</dd>
+      </dl></div><div class="section level2">
+      <h2 id="deprecation">Deprecation<a class="anchor" aria-label="anchor" href="#deprecation"></a></h2>
+
+      <div class="section-desc"><p>Helpers for gracefully retiring generics, classes, and properties: old code keeps working, but warns users to update.</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="deprecated_generic.html">deprecated_generic()</a></code>
+
+        </dt>
+        <dd>Deprecate a generic</dd>
+
+        <dt>
+
+          <code><a href="deprecated_class.html">deprecated_class()</a></code>
+
+        </dt>
+        <dd>Deprecate a class</dd>
+
+        <dt>
+
+          <code><a href="deprecated_property.html">deprecated_property()</a></code>
+
+        </dt>
+        <dd>Deprecate a property</dd>
       </dl></div><div class="section level2">
       <h2 id="compatibility">Compatibility<a class="anchor" aria-label="anchor" href="#compatibility"></a></h2>
 
@@ -282,10 +355,10 @@
 
         <dt>
 
-          <code><a href="S4_register.html">S4_register()</a></code>
+          <code><a href="S4_register.html">S4_register()</a></code> <code><a href="S4_register.html">S4_contains()</a></code>
 
         </dt>
-        <dd>Register an S7 or S3 class with S4</dd>
+        <dd>Register an S7, S3, or union class with S4</dd>
       </dl></div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>
@@ -296,7 +369,7 @@
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

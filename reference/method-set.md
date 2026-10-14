@@ -14,7 +14,7 @@ generics. But this is not a general method registration function: at
 least one of `generic` and `signature` needs to be from S7.
 
 Note that if you are writing a package, you must call
-[`methods_register()`](https://rconsortium.github.io/S7/reference/methods_register.md)
+[`S7_on_load()`](https://rconsortium.github.io/S7/reference/S7_on_load.md)
 in your `.onLoad`. This ensures that all methods are dynamically
 registered when needed.
 
@@ -34,6 +34,11 @@ method(generic, signature) <- value
   generic](https://rconsortium.github.io/S7/reference/new_external_generic.md),
   an [S3 generic](https://rdrr.io/r/base/UseMethod.html), or an [S4
   generic](https://rdrr.io/r/methods/setGeneric.html).
+
+  Note that because `method<-` is an assignment function,
+  `method(pkg::gen, class) <- f` will not work. You must either import
+  `gen` into your namespace or use
+  [`new_external_generic()`](https://rconsortium.github.io/S7/reference/new_external_generic.md).
 
 - signature:
 
@@ -78,13 +83,33 @@ method(generic, signature) <- value
 
 ## Value
 
-The `generic`, invisibly.
+Usually `generic`, invisibly.
+
+When registering a method for a generic that lives in another package
+(an external, S3, or S4 generic), returns a sentinel object instead, to
+avoid embedding a copy of that generic in your package. See
+[`vignette("packages")`](https://rconsortium.github.io/S7/articles/packages.md)
+for details.
+
+## Operators
+
+Binary operators such as `+` and `-` dispatch on `e1` and `e2`. To
+define a unary method, use `list(Foo, class_missing)` as the signature
+and a function with arguments `e1` and `e2`; `e2` will be missing when
+called. This lets unary and binary methods coexist on the same class.
+
+The `!` operator is always unary. Use `Foo` (or `list(Foo)`) as its
+signature and a function with argument `e1`.
+
+If no unary method is registered, the operator falls back to R's base
+behavior for the underlying object. Errors raised inside a registered
+method are propagated.
 
 ## Examples
 
 ``` r
 # Create a generic
-bizarro <- new_generic("bizarro", "x")
+bizarro := new_generic("x")
 # Register some methods
 method(bizarro, class_numeric) <- function(x) rev(x)
 method(bizarro, new_S3_class("data.frame")) <- function(x) {

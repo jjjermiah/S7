@@ -27,6 +27,7 @@ new_S3_class() because S3 lacks a formal class definition.
     <li><a class="dropdown-item" href="../articles/classes-objects.html">Classes and objects</a></li>
     <li><a class="dropdown-item" href="../articles/compatibility.html">Compatibility with S3 and S4</a></li>
     <li><a class="dropdown-item" href="../articles/packages.html">Using S7 in a package</a></li>
+    <li><a class="dropdown-item" href="../articles/evolution.html">Evolving S7 classes and generics</a></li>
     <li><a class="dropdown-item" href="../articles/motivation.html">Motivation for S7</a></li>
     <li><a class="dropdown-item" href="../articles/performance.html">Performance</a></li>
     <li><hr class="dropdown-divider"></li>
@@ -64,7 +65,13 @@ new_S3_class() because S3 lacks a formal class definition.
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">new_S3_class</span><span class="op">(</span><span class="va">class</span>, constructor <span class="op">=</span> <span class="cn">NULL</span>, validator <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">new_S3_class</span><span class="op">(</span></span>
+<span>  <span class="va">class</span>,</span>
+<span>  constructor <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  validator <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  default <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  attributes <span class="op">=</span> <span class="cn">NULL</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -95,6 +102,23 @@ the S7 object adheres to the constraints of the S3 class.</p>
 <p>A validator is a single argument function that takes the object to
 validate and returns <code>NULL</code> if the object is valid. If the object is
 invalid, it returns a character vector of problems.</p></dd>
+
+
+<dt id="arg-default">default<a class="anchor" aria-label="anchor" href="#arg-default"></a></dt>
+<dd><p>An optional quoted call or symbol to use as the default when
+this class is used for a property. It is evaluated each time the property
+is omitted during object construction. If <code>NULL</code>, the default is
+obtained from <code>constructor</code>. A default supplied to <code><a href="new_property.html">new_property()</a></code> takes
+precedence.</p></dd>
+
+
+<dt id="arg-attributes">attributes<a class="anchor" aria-label="anchor" href="#arg-attributes"></a></dt>
+<dd><p>A character vector of attribute names used by the S3
+class, excluding <code>class</code>. Use <code><a href="https://rdrr.io/r/base/character.html" class="external-link">character()</a></code> for a class with no other
+attributes. The default, <code>NULL</code>, means the attributes are unknown, so
+<code><a href="new_class.html">new_object()</a></code> preserves all attributes of the parent object.
+This declaration controls which attributes are copied during construction;
+it does not require them to be present or validate their values.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -142,8 +166,15 @@ A Date is a numeric vector with class <code>Date</code> that can be constructed 
 <span>    <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">is.numeric</a></span><span class="op">(</span><span class="va">self</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>      <span class="st">"Underlying data must be numeric"</span></span>
 <span>    <span class="op">}</span></span>
-<span>  <span class="op">}</span></span>
+<span>  <span class="op">}</span>,</span>
+<span>  default <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/substitute.html" class="external-link">quote</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/base-internal.html" class="external-link">.Date</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/integer.html" class="external-link">integer</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre><p></p></div>
+<p>You can also declare the complete set of attributes used by the S3 class
+with <code>attributes</code>. This allows <code><a href="new_class.html">new_object()</a></code> to discard foreign attributes
+when constructing S7 subclasses, while preserving the declared attributes
+and S7 properties. Include optional attributes such as <code>names</code> if they are
+supported; <code>class</code> is managed automatically. For example, a factor wrapper
+could use <code>attributes = c("levels", "names", "dim", "dimnames")</code>.</p>
     </div>
 
     <div class="section level2">
@@ -151,7 +182,7 @@ A Date is a numeric vector with class <code>Date</code> that can be constructed 
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># No checking, just used for dispatch</span></span></span>
 <span class="r-in"><span><span class="va">Date</span> <span class="op">&lt;-</span> <span class="fu">new_S3_class</span><span class="op">(</span><span class="st">"Date"</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="va">my_generic</span> <span class="op">&lt;-</span> <span class="fu"><a href="new_generic.html">new_generic</a></span><span class="op">(</span><span class="st">"my_generic"</span>, <span class="st">"x"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">my_generic</span> <span class="op">:=</span> <span class="fu"><a href="new_generic.html">new_generic</a></span><span class="op">(</span><span class="st">"x"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="method.html">method</a></span><span class="op">(</span><span class="va">my_generic</span>, <span class="va">Date</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="st">"This is a date"</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="fu">my_generic</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Sys.time.html" class="external-link">Sys.Date</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
@@ -167,7 +198,7 @@ A Date is a numeric vector with class <code>Date</code> that can be constructed 
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

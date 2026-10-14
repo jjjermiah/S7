@@ -8,7 +8,13 @@ it's an important base class already defined in
 ## Usage
 
 ``` r
-new_S3_class(class, constructor = NULL, validator = NULL)
+new_S3_class(
+  class,
+  constructor = NULL,
+  validator = NULL,
+  default = NULL,
+  attributes = NULL
+)
 ```
 
 ## Arguments
@@ -43,6 +49,26 @@ new_S3_class(class, constructor = NULL, validator = NULL)
   A validator is a single argument function that takes the object to
   validate and returns `NULL` if the object is valid. If the object is
   invalid, it returns a character vector of problems.
+
+- default:
+
+  An optional quoted call or symbol to use as the default when this
+  class is used for a property. It is evaluated each time the property
+  is omitted during object construction. If `NULL`, the default is
+  obtained from `constructor`. A default supplied to
+  [`new_property()`](https://rconsortium.github.io/S7/reference/new_property.md)
+  takes precedence.
+
+- attributes:
+
+  A character vector of attribute names used by the S3 class, excluding
+  `class`. Use [`character()`](https://rdrr.io/r/base/character.html)
+  for a class with no other attributes. The default, `NULL`, means the
+  attributes are unknown, so
+  [`new_object()`](https://rconsortium.github.io/S7/reference/new_class.md)
+  preserves all attributes of the parent object. This declaration
+  controls which attributes are copied during construction; it does not
+  require them to be present or validate their values.
 
 ## Value
 
@@ -100,8 +126,18 @@ is a numeric vector with class `Date` that can be constructed with
         if (!is.numeric(self)) {
           "Underlying data must be numeric"
         }
-      }
+      },
+      default = quote(.Date(integer()))
     )
+
+You can also declare the complete set of attributes used by the S3 class
+with `attributes`. This allows
+[`new_object()`](https://rconsortium.github.io/S7/reference/new_class.md)
+to discard foreign attributes when constructing S7 subclasses, while
+preserving the declared attributes and S7 properties. Include optional
+attributes such as `names` if they are supported; `class` is managed
+automatically. For example, a factor wrapper could use
+`attributes = c("levels", "names", "dim", "dimnames")`.
 
 ## Examples
 
@@ -109,7 +145,7 @@ is a numeric vector with class `Date` that can be constructed with
 # No checking, just used for dispatch
 Date <- new_S3_class("Date")
 
-my_generic <- new_generic("my_generic", "x")
+my_generic := new_generic("x")
 method(my_generic, Date) <- function(x) "This is a date"
 
 my_generic(Sys.Date())
