@@ -1,6 +1,10 @@
 # Called from C
 dispatch_arg_missing <- function(x) missing(x)
 
+# Called from C: collects arguments into a `...` that can be bound in another
+# frame, see method_call_().
+dispatch_dots <- function(...) environment()
+
 # Called from C
 dispatch_not_generic_error <- function() {
   stop2(
