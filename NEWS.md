@@ -331,11 +331,11 @@
   S7 generic, such as `unclass(generic)()` (#684).
 
 * The call recorded for a dispatched method, as returned by `sys.call()` and
-  `conditionCall()`, is now `` `method(generic, Class)`(...) `` and can be
-  deparsed, e.g. by `deparse()` or `rlang::as_label()`, on all versions of R.
-  Previously, `deparse()` failed with `'S4SXP': should not happen` when an
-  argument was an S7 object. This means tracebacks no longer show the argument
-  values (@jjjermiah, #783).
+  `conditionCall()`, can now be deparsed, e.g. by `deparse()` or
+  `rlang::as_label()`, on all versions of R. Previously `deparse()` failed with
+  `'S4SXP': should not happen` when a dispatch argument was an S7 object. Such
+  arguments now appear in the call as `...`, as in `` `method(foo, Foo)`(...) ``
+  (@jjjermiah, #783).
 
 * `str()` works for S7 objects that inherit from data.frame and other S3 classes
   whose `dim` attribute is incompatible with the bare underlying type (#494).

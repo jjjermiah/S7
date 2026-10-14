@@ -197,6 +197,31 @@ static void method_eval_cleanup(void *data_) {
   }
 }
 
+// Whether deparse() fails on x on released versions of R: it can't print an S7
+// object (an OBJSXP without the S4 bit, #783). deparse() also forces promises,
+// so we can't leave such a value in the call that the method is evaluated with.
+static inline
+int is_undeparsable(SEXP x) {
+#ifdef OBJSXP
+  return TYPEOF(x) == OBJSXP && !Rf_isS4(x);
+#else
+  return TYPEOF(x) == S4SXP && !Rf_isS4(x);
+#endif
+}
+
+// Add `name = arg` to the args to route through `...`, creating the call to
+// dispatch_dots() on first use.
+static inline
+void route_arg(SEXP *rcall, SEXP *rcall_tail, PROTECT_INDEX pi, SEXP name, SEXP arg) {
+  if (*rcall == R_NilValue) {
+    *rcall = Rf_lcons(fn_dispatch_dots, R_NilValue);
+    REPROTECT(*rcall, pi);
+    *rcall_tail = *rcall;
+  }
+  APPEND_NODE(*rcall_tail, name, arg);
+  *rcall_tail = CDR(*rcall_tail);
+}
+
 SEXP method_call_(SEXP call_, SEXP op_, SEXP args_, SEXP env_) {
   args_ = CDR(args_);
   SEXP generic = CAR(args_); args_ = CDR(args_);
@@ -224,9 +249,17 @@ SEXP method_call_(SEXP call_, SEXP op_, SEXP args_, SEXP env_) {
   SEXP mcall = PROTECT(Rf_lcons(R_NilValue, R_NilValue));
   SEXP mcall_tail = mcall;
 
-  PROTECT_INDEX arg_pi, val_pi;
+  PROTECT_INDEX arg_pi, val_pi, rcall_pi;
   PROTECT_WITH_INDEX(R_NilValue, &arg_pi); // unnecessary, for rchk only
   PROTECT_WITH_INDEX(R_NilValue, &val_pi); // unnecessary, for rchk only
+
+  // Arguments that must not be recorded in the method call, see
+  // is_undeparsable(). They go through `...` instead; rcall is a call to
+  // dispatch_dots() with those arguments (and the generic's `...`).
+  PROTECT_WITH_INDEX(R_NilValue, &rcall_pi);
+  SEXP rcall = R_NilValue;
+  SEXP rcall_tail = R_NilValue;
+  int has_dots = 0;
 
   // For each of the arguments to the generic
   for (R_xlen_t i = 0; i < n_args; ++i) {
@@ -266,7 +299,11 @@ SEXP method_call_(SEXP call_, SEXP op_, SEXP args_, SEXP env_) {
           // If we wanted substitute() to work here too, we could do:
           //   if (TYPEOF(arg) == PROMSXP) { SET_PRVALUE(arg, true_val); } else { arg = true_val; }
           SEXP arg = VECTOR_ELT(val, 0); // true_val used for dispatch
-          APPEND_NODE(mcall_tail, name, arg);
+          if (is_undeparsable(arg)) {
+            route_arg(&rcall, &rcall_tail, rcall_pi, name, arg);
+          } else {
+            APPEND_NODE(mcall_tail, name, arg);
+          }
 
           // Put the super() stored class dispatch vector into dispatch_classes
           SET_VECTOR_ELT(dispatch_classes, i, VECTOR_ELT(val, 1));
@@ -275,7 +312,11 @@ SEXP method_call_(SEXP call_, SEXP op_, SEXP args_, SEXP env_) {
 
           // The PROMSXP arg will have been updated in place by Rf_eval() above.
           // Add to arguments of method call
-          APPEND_NODE(mcall_tail, name, arg);
+          if (is_undeparsable(val)) {
+            route_arg(&rcall, &rcall_tail, rcall_pi, name, arg);
+          } else {
+            APPEND_NODE(mcall_tail, name, arg);
+          }
 
           // Determine class string to use for method look up
           SET_VECTOR_ELT(dispatch_classes, i, S7_obj_dispatch(val));
@@ -284,15 +325,21 @@ SEXP method_call_(SEXP call_, SEXP op_, SEXP args_, SEXP env_) {
     } else {
       // other arguments not used for dispatch
       if (name == R_DotsSymbol) {
+        has_dots = 1;
         SETCDR(mcall_tail, Rf_cons(R_DotsSymbol, R_NilValue));
       } else {
-        // pass along the promise so substitute() works
+        // Pass along the promise so substitute() works. We don't force it to
+        // check is_undeparsable(), so a non-dispatch argument holding such an
+        // object still breaks deparse() of the call.
         SEXP arg = Rf_findVarInFrame(envir, name);
         APPEND_NODE(mcall_tail, name, arg);
       }
     }
 
-    mcall_tail = CDR(mcall_tail);
+    // Nothing was appended if the argument was routed through `...`
+    if (CDR(mcall_tail) != R_NilValue) {
+      mcall_tail = CDR(mcall_tail);
+    }
     formals = CDR(formals);
   }
 
@@ -301,7 +348,7 @@ SEXP method_call_(SEXP call_, SEXP op_, SEXP args_, SEXP env_) {
   if (m == R_NilValue) {
     // Operators can fall back without signalling a missing-method error.
     if (fallback != R_NilValue) {
-      UNPROTECT(4);
+      UNPROTECT(5);
       return fallback;
     }
     S7_method_lookup_error(generic, envir);
@@ -320,25 +367,32 @@ SEXP method_call_(SEXP call_, SEXP op_, SEXP args_, SEXP env_) {
 
   Rf_defineVar(method_name, m, envir);
 
-  // `mcall` holds the arguments for the method: dispatch args as their original
-  // (forced) promises, other args as their promises, and `...`. Recording these
-  // promises in the method's call breaks deparse() of conditionCall() and
-  // sys.call() on released versions of R (#783), because deparse() forces a
-  // promise and then can't print the S7 object it holds. So instead we collect the arguments
-  // into a `...` (a DOTSXP: it keeps tags and promises, so substitute() still
-  // finds the original expressions) and call the method as `method(...)`.
-  //
-  // R only exposes a DOTSXP as the `...` of a frame, so get one by calling
-  // dispatch_dots() with the arguments, from envir so that `...` is expanded.
-  SETCAR(mcall, fn_dispatch_dots);
-  SEXP dots_env = PROTECT(Rf_eval(mcall, envir));
+  if (rcall == R_NilValue) {
+    SETCAR(mcall, method_name);
+    SEXP out = Rf_eval(mcall, envir);
+    UNPROTECT(5);
+    return out;
+  }
+
+  // Some arguments are routed through `...` (see is_undeparsable()). Collect
+  // them, and the generic's own `...` if it has one, into a DOTSXP. R only
+  // exposes a DOTSXP as the `...` of a frame, so get one by calling
+  // dispatch_dots(), from envir so that `...` is expanded.
+  if (has_dots) {
+    SETCDR(rcall_tail, Rf_cons(R_DotsSymbol, R_NilValue));
+  } else {
+    // The method call needs a `...` to pick up the routed arguments.
+    SETCDR(mcall_tail, Rf_cons(R_DotsSymbol, R_NilValue));
+  }
+  SEXP dots_env = PROTECT(Rf_eval(rcall, envir));
   SEXP dots = Rf_findVarInFrame(dots_env, R_DotsSymbol);
 
   // The method is still called from envir (the generic's frame), so that
   // parent.frame() etc. are unchanged. Hence `...` must be bound in envir for
   // the duration of the call.
+  SETCAR(mcall, method_name);
   struct method_eval_data data = {
-    PROTECT(Rf_lang2(method_name, R_DotsSymbol)),
+    mcall,
     envir,
     PROTECT(Rf_findVarInFrame(envir, R_DotsSymbol))
   };

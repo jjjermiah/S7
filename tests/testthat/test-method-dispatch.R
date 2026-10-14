@@ -323,33 +323,56 @@ test_that("errors from dispatched methods have reasonable tracebacks", {
 test_that("the call of a dispatched method can be deparsed (#783)", {
   skip_if_not_installed("rlang")
 
+  # deparse() can't print S7 objects on released versions of R, so those
+  # arguments are not recorded in the call. They are passed through `...`.
   Foo <- new_class("Foo", package = NULL)
   Bar <- new_class("Bar", Foo, package = NULL)
-  # `z` is not used for dispatch; the dispatch arguments are S7 objects, which
-  # deparse() can't print on older versions of R.
   foo := new_generic(c("x", "y"), function(x, y, ..., z = 1) S7_dispatch())
   method(foo, list(Foo, Foo)) <- function(x, y, ..., z = 1) stop("boom")
-
+  method(foo, list(Foo, class_double)) <- function(x, y, ..., z = 1) {
+    stop("boom")
+  }
+  method(foo, list(class_double, class_double)) <- function(x, y, ..., z = 1) {
+    stop("boom")
+  }
   get_call <- function(code) conditionCall(tryCatch(code, error = identity))
-  expected <- "`method(foo, list(Foo, Foo))`(...)"
 
-  expect_identical(deparse1(get_call(foo(Foo(), Foo()))), expected)
-  expect_identical(deparse1(get_call(foo(Foo(), Foo(), 1, z = 2))), expected)
-  expect_identical(rlang::as_label(get_call(foo(Foo(), Foo()))), expected)
+  # both dispatch arguments are S7 objects
+  call <- get_call(foo(Foo(), Foo()))
+  expect_identical(deparse1(call), "`method(foo, list(Foo, Foo))`(..., z = 1)")
+  expect_identical(rlang::as_label(call), deparse1(call))
+  call <- get_call(foo(Foo(), Foo(), 1, z = 2))
+  expect_identical(deparse1(call), "`method(foo, list(Foo, Foo))`(..., z = 2)")
+  expect_identical(rlang::as_label(call), deparse1(call))
+
+  # only one is: the other argument stays in the call
+  call <- get_call(foo(Foo(), 3, 1, z = 2))
   expect_identical(
-    rlang::as_label(get_call(foo(Foo(), Foo(), 1, z = Foo()))),
-    expected
+    deparse1(call),
+    "`method(foo, list(Foo, class_double))`(y = 3, ..., z = 2)"
+  )
+  expect_identical(rlang::as_label(call), deparse1(call))
+
+  # none are: the call is unchanged
+  call <- get_call(foo(1, 2, 3))
+  expect_identical(
+    deparse1(call),
+    "`method(foo, list(class_double, class_double))`(x = 1, y = 2, ..., z = 1)"
   )
 
-  # super() inlines the S7 value in the method call
-  expect_identical(
-    deparse1(get_call(foo(super(Bar(), Foo), Foo()))),
-    expected
-  )
-  expect_identical(
-    rlang::as_label(get_call(foo(Foo(), super(Bar(), Foo), z = Foo()))),
-    expected
-  )
+  # super() puts the S7 value in the call
+  call <- get_call(foo(super(Bar(), Foo), Foo()))
+  expect_identical(deparse1(call), "`method(foo, list(Foo, Foo))`(..., z = 1)")
+  expect_identical(rlang::as_label(call), deparse1(call))
+  call <- get_call(foo(Foo(), super(Bar(), Foo), z = 4))
+  expect_identical(deparse1(call), "`method(foo, list(Foo, Foo))`(..., z = 4)")
+
+  # generics without `...`
+  bar := new_generic("x", function(x, y) S7_dispatch())
+  method(bar, Foo) <- function(x, y) stop("boom")
+  call <- get_call(bar(Foo(), 1))
+  expect_identical(deparse1(call), "`method(bar, Foo)`(y = 1, ...)")
+  expect_identical(rlang::as_label(call), deparse1(call))
 })
 
 test_that("dispatching through `...` preserves method arguments", {
@@ -361,7 +384,7 @@ test_that("dispatching through `...` preserves method arguments", {
       substitute(y),
       substitute(z),
       substitute(list(...)),
-      names(list(...)),
+      unlist(list(...)),
       missing(z),
       nargs()
     )
@@ -377,14 +400,14 @@ test_that("dispatching through `...` preserves method arguments", {
       quote(1 + 2),
       quote(x),
       quote(list(k = 3, 4 * 5)),
-      c("k", ""),
+      c(k = 3, 20),
       FALSE,
       5L
     )
   )
   expect_identical(
-    forward(x, nn, a = 1)[c(1, 2, 4)],
-    list(quote(obj), quote(n), quote(list(a = 1)))
+    forward(x, nn, a = 1)[c(1, 2, 4, 5)],
+    list(quote(obj), quote(n), quote(list(a = 1)), c(a = 1))
   )
   expect_identical(foo(x, 1)[c(3, 6)], list(quote(x), FALSE))
 
@@ -394,6 +417,24 @@ test_that("dispatching through `...` preserves method arguments", {
     list(res, ...length(), names(list(...)))
   })
   method(bar, class_numeric) <- function(x, ...) ...length()
+  method(bar, Foo) <- function(x, ...) ...length()
   expect_identical(bar(1, 2, a = 3), list(2L, 2L, c("", "a")))
   expect_identical(bar(1), list(0L, 0L, NULL))
+  expect_identical(bar(x, 2, a = 3), list(2L, 2L, c("", "a")))
+  expect_identical(bar(x), list(0L, 0L, NULL))
+
+  # The method is still called from the generic's frame
+  baz := new_generic("x", function(x, ...) {
+    frame <- environment()
+    list(S7_dispatch(), frame)
+  })
+  method(baz, class_numeric) <- function(x, ...) {
+    list(parent.frame(), deparse1(match.call()))
+  }
+  method(baz, Foo) <- function(x, ...) parent.frame()
+  res <- baz(1, 2)
+  expect_identical(res[[1]][[1]], res[[2]])
+  expect_identical(res[[1]][[2]], "`method(baz, class_double)`(x = 1, 2)")
+  res <- baz(x, 2)
+  expect_identical(res[[1]], res[[2]])
 })
